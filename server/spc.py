@@ -61,10 +61,10 @@ def update_spc(db: Session, source: str, metric_name: str, new_value: float) -> 
             state.m2        = 0.0
         else:
             delta           = new_value - state.mu_hat
-            state.mu_hat   += delta / state.n_baseline
+            state.mu_hat    = float(state.mu_hat + delta / state.n_baseline)
             delta2          = new_value - state.mu_hat
-            state.m2       += delta * delta2
-            state.sigma_hat = np.sqrt(state.m2 / (state.n_baseline - 1))
+            state.m2        = float(state.m2 + delta * delta2)
+            state.sigma_hat = float(np.sqrt(state.m2 / (state.n_baseline - 1)))
 
         state.status     = "collecting"
         state.updated_at = datetime.utcnow()

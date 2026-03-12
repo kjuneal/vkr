@@ -33,13 +33,22 @@ from agents.base_agent import BaseAgent
 # agent_a_stream.py
 
 import time
+from sqlalchemy.engine import URL
 
 
 class AgentA(BaseAgent):
 
-    def __init__(self, connection_string, server_url, window_size=20, delay=2):
+    def __init__(self, db_name, server_url, window_size=20, delay=2):
         super().__init__(server_url)
-        self.engine = create_engine(connection_string)
+        url = URL.create(
+            drivername="postgresql+psycopg2",
+            username="postgres",
+            password="12345",
+            host="localhost",
+            port=5432,
+            database=db_name,
+        )
+        self.engine = create_engine(url)
         self.window_size = window_size
         self.delay = delay
 
@@ -77,11 +86,9 @@ class AgentA(BaseAgent):
 
 if __name__ == "__main__":
 
-    conn = "postgresql://postgres:12345@localhost:5432/source_a"
-
     agent = AgentA(
-        conn,
-        "http://127.0.0.1:8000",
+        db_name="source_a.db",
+        server_url="http://127.0.0.1:8000",
         window_size=20,
         delay=2
     )
