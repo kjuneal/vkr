@@ -16,7 +16,7 @@ class BaseAgent:
         }
 
         response = requests.post(
-            f"{self.server_url}/metrics",
+            f"{self.server_url}/metrics/",
             json=payload
         )
 
