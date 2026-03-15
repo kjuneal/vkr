@@ -2,6 +2,11 @@
 # # uvicorn server.main:app --reload
 # # server\main.py
 
+
+# DROP TABLE IF EXISTS spc_state;
+# DROP TABLE IF EXISTS metrics;
+# -- TRUNCATE TABLE metrics RESTART IDENTITY;
+
 # from fastapi import FastAPI, Depends
 # from sqlalchemy.orm import Session
 
@@ -57,6 +62,7 @@ from sqlalchemy.orm import Session
 from server import models, schemas, crud
 from server import spc
 from server.database import engine, SessionLocal
+from server.models import Metric
 
 # Создаём таблицы (включая новую spc_state)
 models.Base.metadata.create_all(bind=engine)
@@ -104,24 +110,31 @@ def receive_metrics(batch: schemas.MetricsBatch, db: Session = Depends(get_db)):
 
 
 # ── Эндпоинты для Streamlit ───────────────────────────────────────────────
-
 @app.get("/spc/")
 def get_all_spc_states(db: Session = Depends(get_db)):
-    """Все состояния — для дашборда (страница 1)."""
     states = spc.get_all_states(db)
-    return [_state_to_dict(s) for s in states]
-
+    return [_state_to_dict(s, db) for s in states]
 
 @app.get("/spc/{source}/{metric_name}")
 def get_spc_state(source: str, metric_name: str, db: Session = Depends(get_db)):
-    """Состояние конкретной метрики — для детального анализа (страница 2)."""
     state = spc.get_state(db, source, metric_name)
     if state is None:
         return {"error": "not found"}
-    return _state_to_dict(state)
+    return _state_to_dict(state, db)
 
+def _state_to_dict(s, db: Session = None) -> dict:
+    # Получаем последнее значение метрики из таблицы metrics
+    last_value = None
+    if db:
+        last = (
+            db.query(Metric)
+            .filter(Metric.source == s.source, Metric.metric_name == s.metric_name)
+            .order_by(Metric.timestamp.desc())
+            .first()
+        )
+        if last:
+            last_value = last.metric_value
 
-def _state_to_dict(s) -> dict:
     return {
         "source":           s.source,
         "metric_name":      s.metric_name,
@@ -134,9 +147,23 @@ def _state_to_dict(s) -> dict:
         "cusum_pos":        s.cusum_pos,
         "cusum_neg":        s.cusum_neg,
         "ewma_z":           s.ewma_z,
+        "last_value":       last_value,   # ← новое поле
         "signal_shewhart":  s.signal_shewhart,
         "signal_cusum":     s.signal_cusum,
         "signal_ewma":      s.signal_ewma,
         "last_signal_at":   str(s.last_signal_at) if s.last_signal_at else None,
         "updated_at":       str(s.updated_at),
     }
+
+
+
+@app.get("/metrics/history/{source}/{metric_name}")
+def get_metrics_history(source: str, metric_name: str, limit: int = 200, db: Session = Depends(get_db)):
+    rows = (
+        db.query(Metric)
+        .filter(Metric.source == source, Metric.metric_name == metric_name)
+        .order_by(Metric.timestamp.asc())
+        .limit(limit)
+        .all()
+    )
+    return [{"timestamp": str(r.timestamp), "value": r.metric_value} for r in rows]
