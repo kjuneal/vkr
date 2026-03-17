@@ -8,7 +8,7 @@ import sys, os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from api import reset_experiment
+from api import reset_experiment, show_alerts
 from sqlalchemy.engine import URL
 from sqlalchemy import create_engine, text
 
@@ -112,6 +112,9 @@ def run_agent_c(window_size, delay, status_dict):
 # ── Интерфейс ──────────────────────────────────────────────────────────────
 
 st.title("🧪 Управление экспериментом")
+
+show_alerts()
+
 st.caption("Настройте параметры, нажмите «Начать» — система сгенерирует данные и запустит агентов")
 
 st.divider()

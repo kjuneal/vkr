@@ -48,3 +48,30 @@ def get_metrics_history(source, metric_name, limit=200):
         return r.json()
     except Exception:
         return []
+    
+def show_alerts(states=None):
+    """Показывает toast-уведомления о новых сигналах. Вызывать в начале каждой страницы."""
+    if states is None:
+        states = get_all_states()
+
+    if "seen_signals" not in st.session_state:
+        st.session_state.seen_signals = set()
+
+    alerts = [s for s in states if s["status"] in ("critical", "warning")]
+
+    for a in alerts:
+        signal_key = f"{a['source']}_{a['metric_name']}_{a['last_signal_at']}"
+
+        if signal_key not in st.session_state.seen_signals:
+            st.session_state.seen_signals.add(signal_key)
+
+            if a["status"] == "critical":
+                st.toast(
+                    f"🔴 {a['source']} · {metric_label(a['metric_name'])} · КРИТИЧНО",
+                    icon="🚨"
+                )
+            else:
+                st.toast(
+                    f"🟡 {a['source']} · {metric_label(a['metric_name'])} · ВНИМАНИЕ",
+                    icon="⚠️"
+                )

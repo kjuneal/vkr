@@ -2,9 +2,11 @@ import streamlit as st
 import pandas as pd
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from api import get_all_states, metric_label
+from api import get_all_states, metric_label, show_alerts
 
 st.title("🔔 Журнал событий")
+
+show_alerts() 
 
 if st.button("🔄 Обновить"):
     st.cache_data.clear()
