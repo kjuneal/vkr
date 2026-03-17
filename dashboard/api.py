@@ -1,6 +1,13 @@
 import requests
 import streamlit as st
 
+def reset_experiment():
+    try:
+        r = requests.delete(f"{API_URL}/reset/", timeout=5)
+        return r.json()
+    except Exception as e:
+        return {"error": str(e)}
+
 API_URL = "http://127.0.0.1:8000"
 
 METRIC_LABELS = {

@@ -38,7 +38,7 @@ from agents.base_agent import BaseAgent
 
 import time
 
-class AgentBStream(BaseAgent):
+class AgentB(BaseAgent):
 
     def __init__(self, db_path, server_url, window_size=20, delay=2):
         super().__init__(server_url)
@@ -77,7 +77,7 @@ class AgentBStream(BaseAgent):
 
 if __name__ == "__main__":
 
-    agent = AgentBStream(
+    agent = AgentB(
         "source_b.db",
         "http://127.0.0.1:8000",
         window_size=20,

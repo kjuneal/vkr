@@ -3,7 +3,7 @@ import time
 from agents.base_agent import BaseAgent
 
 
-class AgentCStream(BaseAgent):
+class AgentC(BaseAgent):
 
     def __init__(self, filepath, server_url, window_size=20, delay=2):
         super().__init__(server_url)
@@ -37,7 +37,7 @@ class AgentCStream(BaseAgent):
 
 
 if __name__ == "__main__":
-    agent = AgentCStream(
+    agent = AgentC(
         "data/source_c.csv",
         "http://127.0.0.1:8000",
         window_size=20,

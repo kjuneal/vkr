@@ -167,3 +167,10 @@ def get_metrics_history(source: str, metric_name: str, limit: int = 200, db: Ses
         .all()
     )
     return [{"timestamp": str(r.timestamp), "value": r.metric_value} for r in rows]
+
+@app.delete("/reset/")
+def reset_experiment(db: Session = Depends(get_db)):
+    db.query(models.Metric).delete()
+    db.query(spc.SPCState).delete()
+    db.commit()
+    return {"status": "cleared"}

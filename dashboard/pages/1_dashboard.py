@@ -5,14 +5,12 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from api import get_all_states, metric_label
 
 
-#st.title("📊 Дашборд качества данных")
-st.title("Дашборд качества данных")
+st.title("📊 Дашборд качества данных")
 st.caption("Обновление каждые 30 секунд")
 
-# if st.button("🔄 Обновить"):
-#     st.cache_data.clear()
-if st.button("Обновить"):
+if st.button("🔄 Обновить"):
     st.cache_data.clear()
+
 
 
 states = get_all_states()
@@ -72,8 +70,7 @@ for col, (source_name, metrics) in zip(cols, sources.items()):
 st.divider()
 
 # Активные сигналы
-#st.subheader("🚨 Активные сигналы")
-st.subheader("Активные сигналы")
+st.subheader("🚨 Активные сигналы")
 alerts = [s for s in states if s["status"] in ("critical", "warning")]
 
 if not alerts:
