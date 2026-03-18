@@ -1,0 +1,18 @@
+# База данных SQLite
+*.db
+
+# Кэш Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Данные (генерируются автоматически)
+data/*.csv
+
+# Виртуальное окружение
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/

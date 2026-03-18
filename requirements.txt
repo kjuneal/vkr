@@ -7,3 +7,5 @@ numpy
 requests
 streamlit
 plotly
+scipy        # ← используется в spc.py для статистических тестов
+alembic      # ← если планируются миграции (можно не добавлять)
