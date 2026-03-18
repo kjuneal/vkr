@@ -1,10 +1,14 @@
 import streamlit as st
 import threading
 import time
-import numpy as np
-import pandas as pd
 import sqlite3
 import sys, os
+
+# Корень проекта в путь до всех локальных импортов
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, ROOT)
+
+from data_generate import generate_data
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -21,29 +25,6 @@ SQLITE_PATH = os.path.join(ROOT, "source_b.db")
 PG_DB_NAME  = "source_a.db" 
 
 # ── Генераторы данных ──────────────────────────────────────────────────────
-
-def generate_data(n, mu, sigma, degradation, deg_start, deg_value):
-    values = np.random.normal(mu, sigma, n)
-
-    if degradation == "mean_shift" and deg_start < n:
-        values[deg_start:] += deg_value
-
-    elif degradation == "variance" and deg_start < n:
-        extra = np.random.normal(0, deg_value, n - deg_start)
-        values[deg_start:] += extra
-
-    elif degradation == "missing":
-        # missing применяется агентом через NaN
-        missing_idx = np.random.choice(
-            range(deg_start, n),
-            size=int((n - deg_start) * deg_value),
-            replace=False
-        )
-        values[missing_idx] = np.nan
-
-    timestamps = pd.date_range("2026-01-01", periods=n, freq="min")
-    return pd.DataFrame({"timestamp": timestamps, "value": values})
-
 
 def load_to_postgres(df, db_name):
     url = URL.create(
@@ -73,37 +54,37 @@ def load_to_csv(df, path):
 
 # ── Запуск агентов ─────────────────────────────────────────────────────────
 
-def run_agent_a(window_size, delay, status_dict):
+def run_agent_a(window_size, delay, selected, status_dict):
     import sys, os
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     os.environ["PGCLIENTENCODING"] = "UTF8"
     from agents.agent_a import AgentA
     try:
-        agent = AgentA(PG_DB_NAME, SERVER_URL, window_size, delay)
+        agent = AgentA(PG_DB_NAME, SERVER_URL, window_size, delay, selected)
         agent.run()
         status_dict["a"] = "✅ завершён"
     except Exception as e:
         status_dict["a"] = f"❌ ошибка: {e}"
 
 
-def run_agent_b(window_size, delay, status_dict):
+def run_agent_b(window_size, delay, selected, status_dict):
     import sys, os
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     from agents.agent_b import AgentB
     try:
-        agent = AgentB(SQLITE_PATH, SERVER_URL, window_size, delay)
+        agent = AgentB(SQLITE_PATH, SERVER_URL, window_size, delay, selected)
         agent.run()
         status_dict["b"] = "✅ завершён"
     except Exception as e:
         status_dict["b"] = f"❌ ошибка: {e}"
 
 
-def run_agent_c(window_size, delay, status_dict):
+def run_agent_c(window_size, delay, selected, status_dict):
     import sys, os
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     from agents.agent_c import AgentC
     try:
-        agent = AgentC(CSV_PATH, SERVER_URL, window_size, delay)
+        agent = AgentC(CSV_PATH, SERVER_URL, window_size, delay, selected)
         agent.run()
         status_dict["c"] = "✅ завершён"
     except Exception as e:
@@ -151,9 +132,35 @@ with col4:
     )
 st.divider()
 
+ALL_METRICS = {
+    "mean":         "Среднее",
+    "std":          "Стд. отклонение",
+    "completeness": "Полнота",
+    "median":       "Медиана",
+    "iqr":          "МКР (IQR)",
+}
+DEGRADATION_OPTIONS = {
+    "none":          "Без деградации",
+    "mean_shift":    "Сдвиг среднего",
+    "variance":      "Рост дисперсии",
+    "missing":       "Пропуски",
+    "gradual_drift": "Постепенный дрейф",
+    "spikes":        "Случайные выбросы",
+}
+
+# Подсказки по параметру деградации
+DEG_PARAM_HELP = {
+    "none":          ("—", "Параметр не используется", 0.0),
+    "mean_shift":    ("Величина сдвига (Δ)", "На сколько единиц сдвинется среднее. Рекомендуется: 1σ–3σ", 20.0),
+    "variance":      ("Доп. σ", "Насколько вырастет стандартное отклонение. Рекомендуется: 0.5σ–2σ", 10.0),
+    "missing":       ("Доля пропусков", "Доля записей с NaN (0.0–0.5). 0.2 = 20% пропусков", 0.2),
+    "gradual_drift": ("Дрейф за шаг", "Смещение среднего на каждую запись. Рекомендуется: 0.2–1.0", 0.5),
+    "spikes":        ("Вероятность выброса", "Доля записей с резким отклонением (0.0–0.3). 0.1 = 10%", 0.1),
+}
+
 # Параметры источников
-st.subheader("📦 Источник A — PostgreSQL (рост дисперсии)")
-col1, col2, col3 = st.columns(3)
+st.subheader("📦 Источник A — PostgreSQL")
+col1, col2 = st.columns(2)
 with col1:
     n_a = st.number_input(
         "Записей в источнике A", value=200, step=50, min_value=50,
@@ -161,70 +168,146 @@ with col1:
              "Рекомендуется минимум 100 для корректной фазы I SPC + записи с деградацией."
     )
 with col2:
+    deg_type_a = st.selectbox(
+        "Вид деградации",
+        options=list(DEGRADATION_OPTIONS.keys()),
+        format_func=lambda x: DEGRADATION_OPTIONS[x],
+        key="type_a"
+    )
+
+col3, col4 = st.columns(2)
+with col3:
     deg_start_a = st.number_input(
         "Начало деградации (запись №)", value=100, step=10,
         min_value=0, max_value=n_a - 1, key="deg_a",
         help="С какой записи начинается рост дисперсии. "
              "Записи до этого момента используются системой для обучения (фаза I). "
-             "Рекомендуется: не менее 5 × размер окна."
+             "Рекомендуется: не менее 5 × размер окна.", disabled=(deg_type_a == "none")
     )
-with col3:
-    deg_val_a = st.number_input(
-        "Доп. σ при росте дисперсии", value=10.0, step=1.0, min_value=0.0,
-        help="Насколько увеличится разброс данных после начала деградации. "
-             "Например, 10 означает что стандартное отклонение вырастет с базового σ до σ+10. "
-             "Рекомендуется: 0.5σ–2σ для постепенного роста, >2σ для резкого."
-    )
+with col4:
+    param_label, param_help, param_default = DEG_PARAM_HELP[deg_type_a]
+    if deg_type_a == "none":
+        deg_val_a = 0.0
+        st.number_input(param_label if deg_type_a != "none" else "Параметр", value=0.0, disabled=True)
+    else:
+        deg_val_a = st.number_input(param_label, value=param_default, step=0.1, help=param_help, key="val_a")
+
+    # deg_val_a = st.number_input(
+    #     "Доп. σ при росте дисперсии", value=10.0, step=1.0, min_value=0.0,
+    #     help="Насколько увеличится разброс данных после начала деградации. "
+    #          "Например, 10 означает что стандартное отклонение вырастет с базового σ до σ+10. "
+    #          "Рекомендуется: 0.5σ–2σ для постепенного роста, >2σ для резкого."
+    # )
+
+selected_a = st.multiselect(
+    "Метрики источника A",
+    options=list(ALL_METRICS.keys()),
+    default=["mean", "std"],
+    format_func=lambda x: ALL_METRICS[x],
+    help="Какие метрики вычисляет агент A."
+)
 st.divider()
 
-st.subheader("📦 Источник B — SQLite (пропуски)")
-col1, col2, col3 = st.columns(3)
+st.subheader("📦 Источник B — SQLite")
+col1, col2 = st.columns(2)
 with col1:
     n_b = st.number_input(
         "Записей в источнике B", value=200, step=50, min_value=50,
         help="Общее количество строк. Аналогично источнику A."
     )
 with col2:
+    deg_type_b = st.selectbox(
+        "Вид деградации",
+        options=list(DEGRADATION_OPTIONS.keys()),
+        format_func=lambda x: DEGRADATION_OPTIONS[x],
+        index=3,  # по умолчанию "missing"
+        key="type_b"
+    )
+col3, col4 = st.columns(2)
+with col3:
     deg_start_b = st.number_input(
         "Начало деградации (запись №)", value=100, step=10,
         min_value=0, max_value=n_b - 1, key="deg_b",
         help="С какой записи начинают появляться пропущенные значения (NULL). "
-             "До этой записи данные полные (полнота = 1.0)."
+             "До этой записи данные полные (полнота = 1.0).", disabled=(deg_type_b == "none")
     )
-with col3:
-    deg_val_b = st.slider(
-        "Доля пропусков", min_value=0.0, max_value=0.5, value=0.2, step=0.05,
-        help="Какая доля записей будет содержать пропуски после начала деградации. "
-             "0.05 = 5% пропусков (лёгкая деградация), "
-             "0.20 = 20% (умеренная), "
-             "0.50 = 50% (критическая)."
-    )
+with col4:
+    param_label, param_help, param_default = DEG_PARAM_HELP[deg_type_b]
+    if deg_type_b == "none":
+        deg_val_b = 0.0
+        st.number_input("Параметр", value=0.0, disabled=True, key="val_b_dis")
+    else:
+        deg_val_b = st.number_input(param_label, value=param_default, step=0.1, help=param_help, key="val_b")
+        
+    # deg_val_b = st.slider(
+    #     "Доля пропусков", min_value=0.0, max_value=0.5, value=0.2, step=0.05,
+    #     help="Какая доля записей будет содержать пропуски после начала деградации. "
+    #          "0.05 = 5% пропусков (лёгкая деградация), "
+    #          "0.20 = 20% (умеренная), "
+    #          "0.50 = 50% (критическая)."
+    # )
+selected_b = st.multiselect(
+    "Метрики источника B",
+    options=list(ALL_METRICS.keys()),
+    default=["completeness", "mean"],
+    format_func=lambda x: ALL_METRICS[x],
+    help="Какие метрики вычисляет агент B."
+)
 st.divider()
 
-st.subheader("📦 Источник C — CSV (сдвиг среднего)")
-col1, col2, col3 = st.columns(3)
+st.subheader("📦 Источник C — CSV")
+col1, col2 = st.columns(2)
 with col1:
     n_c = st.number_input(
         "Записей в источнике C", value=200, step=50, min_value=50,
         help="Общее количество строк. Аналогично источнику A."
     )
 with col2:
+    deg_type_c = st.selectbox(
+        "Вид деградации",
+        options=list(DEGRADATION_OPTIONS.keys()),
+        format_func=lambda x: DEGRADATION_OPTIONS[x],
+        index=1,  # по умолчанию "mean_shift"
+        key="type_c"
+    )
+col3, col4 = st.columns(2)   
+with col3:
     deg_start_c = st.number_input(
         "Начало деградации (запись №)", value=100, step=10,
         min_value=0, max_value=n_c - 1, key="deg_c",
         help="С какой записи среднее значение начнёт смещаться. "
-             "До этой записи данные генерируются с базовым μ."
+             "До этой записи данные генерируются с базовым μ.", disabled=(deg_type_c == "none")
     )
-with col3:
-    deg_val_c = st.number_input(
-        "Величина сдвига (Δ)", value=20.0, step=5.0,
-        help="На сколько единиц сдвинется среднее после начала деградации. "
-             "Например, при μ=100 и Δ=20 среднее станет ~120. "
-             "Рекомендуется: 1σ–2σ для постепенного, >3σ для мгновенного обнаружения."
-    )
+with col4:
+    param_label, param_help, param_default = DEG_PARAM_HELP[deg_type_c]
+    if deg_type_c == "none":
+        deg_val_c = 0.0
+        st.number_input("Параметр", value=0.0, disabled=True, key="val_c_dis")
+    else:
+        deg_val_c = st.number_input(param_label, value=param_default, step=0.1, help=param_help, key="val_c")
+
+
+    # deg_val_c = st.number_input(
+    #     "Величина сдвига (Δ)", value=20.0, step=5.0,
+    #     help="На сколько единиц сдвинется среднее после начала деградации. "
+    #          "Например, при μ=100 и Δ=20 среднее станет ~120. "
+    #          "Рекомендуется: 1σ–2σ для постепенного, >3σ для мгновенного обнаружения."
+    # )
+
+selected_c = st.multiselect(
+    "Метрики источника C",
+    options=list(ALL_METRICS.keys()),
+    default=["mean", "std", "median"],
+    format_func=lambda x: ALL_METRICS[x],
+    help="Какие метрики вычисляет агент C."
+)
 
 # Кнопка запуска
 if st.button("🚀 Начать эксперимент", type="primary", use_container_width=True):
+
+    if not selected_a or not selected_b or not selected_c:
+        st.error("Выберите хотя бы одну метрику для каждого источника!")
+        st.stop()
 
     # 1. Очищаем старые данные
     with st.status("Подготовка...", expanded=True) as status:
@@ -237,23 +320,23 @@ if st.button("🚀 Начать эксперимент", type="primary", use_con
 
         # 2. Генерация данных
         st.write("⚙️ Генерация данных для источника A...")
-        df_a = generate_data(n_a, mu, sigma, "variance",   deg_start_a, deg_val_a)
+        df_a = generate_data(n_a, mu, sigma, deg_type_a, deg_start_a, deg_val_a)
         load_to_postgres(df_a, PG_DB_NAME)
 
         st.write("⚙️ Генерация данных для источника B...")
-        df_b = generate_data(n_b, mu, sigma, "missing",    deg_start_b, deg_val_b)
+        df_b = generate_data(n_b, mu, sigma, deg_type_b, deg_start_b, deg_val_b)
         load_to_sqlite(df_b, SQLITE_PATH)
 
         st.write("⚙️ Генерация данных для источника C...")
-        df_c = generate_data(n_c, mu, sigma, "mean_shift", deg_start_c, deg_val_c)
+        df_c = generate_data(n_c, mu, sigma, deg_type_c, deg_start_c, deg_val_c)
         load_to_csv(df_c, CSV_PATH)
 
         st.write("🤖 Запуск агентов...")
         status_dict = {"a": "⏳ работает", "b": "⏳ работает", "c": "⏳ работает"}
 
-        t_a = threading.Thread(target=run_agent_a, args=(window_size, delay, status_dict))
-        t_b = threading.Thread(target=run_agent_b, args=(window_size, delay, status_dict))
-        t_c = threading.Thread(target=run_agent_c, args=(window_size, delay, status_dict))
+        t_a = threading.Thread(target=run_agent_a, args=(window_size, delay, selected_a, status_dict))
+        t_b = threading.Thread(target=run_agent_b, args=(window_size, delay, selected_b, status_dict))
+        t_c = threading.Thread(target=run_agent_c, args=(window_size, delay, selected_c, status_dict))
 
         t_a.start()
         t_b.start()

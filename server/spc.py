@@ -36,12 +36,12 @@ class SPCState(Base):
     updated_at      = Column(DateTime, default=datetime.utcnow)
 
 
-BASELINE_SIZE = 5     # ← уменьши для эксперимента
+BASELINE_SIZE = 5 #############   
 CUSUM_K       = 0.5
 CUSUM_H       = 5.0
 EWMA_LAMBDA   = 0.2
 EWMA_L        = 3.0
-SPC_METRICS   = {"mean", "std", "completeness"}
+SPC_METRICS   = {"mean", "std", "completeness", "median", "iqr"}
 
 
 def update_spc(db: Session, source: str, metric_name: str, new_value: float) -> SPCState:
