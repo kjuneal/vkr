@@ -52,6 +52,21 @@ def get_metrics_history(source, metric_name, limit=200):
     except Exception:
         return []
     
+def save_experiment_config(config: dict):
+    try:
+        r = requests.post(f"{API_URL}/experiment/config/", json=config, timeout=5)
+        return r.json()
+    except Exception as e:
+        return {"error": str(e)}
+
+@st.cache_data(ttl=60)
+def get_experiment_config():
+    try:
+        r = requests.get(f"{API_URL}/experiment/config/", timeout=5)
+        return r.json()
+    except Exception:
+        return {}
+    
 def show_alerts(states=None):
     """Показывает toast-уведомления о новых сигналах. Вызывать в начале каждой страницы."""
     if states is None:

@@ -1,68 +1,10 @@
-# # venv\Scripts\activate
-# # uvicorn server.main:app --reload
-# # server\main.py
-
-
-# DROP TABLE IF EXISTS spc_state;
-# DROP TABLE IF EXISTS metrics;
-# -- TRUNCATE TABLE metrics RESTART IDENTITY;
-
-# from fastapi import FastAPI, Depends
-# from sqlalchemy.orm import Session
-
-# from server import models
-# from server import schemas
-# from server import crud
-# from server.database import engine, SessionLocal
-
-# models.Base.metadata.create_all(bind=engine)
-
-# app = FastAPI()
-
-# @app.get("/")
-# def root():
-#     return {"status": "ok"}
-
-# def get_db():
-#     db = SessionLocal()
-#     try:
-#         yield db
-#     finally:
-#         db.close()
-
-# # проверка
-# # @app.post("/metrics")
-# # def receive_metrics(data: dict):
-# #     print(data)
-# #     return {"status": "ok"}
-
-# @app.post("/metrics/")
-# def receive_metrics(batch: schemas.MetricsBatch, db: Session = Depends(get_db)):
-
-#     results = []
-
-#     for name, value in batch.metrics.items():
-#         metric = schemas.MetricCreate(
-#             source=batch.source,
-#             metric_name=name,
-#             metric_value=value,
-#             timestamp=batch.timestamp
-#         )
-
-#         result = crud.create_metric(db=db, metric=metric)
-#         results.append(result)
-
-#     return results
-
-# server/main.py — обновлённая версия
-
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 
 from server import models, schemas, crud
 from server import spc
 from server.database import engine, SessionLocal
-from server.models import Metric
+from server.models import Metric, ExperimentConfig
 
 # Создаём таблицы (включая новую spc_state)
 models.Base.metadata.create_all(bind=engine)
@@ -156,7 +98,6 @@ def _state_to_dict(s, db: Session = None) -> dict:
     }
 
 
-
 @app.get("/metrics/history/{source}/{metric_name}")
 def get_metrics_history(source: str, metric_name: str, limit: int = 200, db: Session = Depends(get_db)):
     rows = (
@@ -174,3 +115,20 @@ def reset_experiment(db: Session = Depends(get_db)):
     db.query(spc.SPCState).delete()
     db.commit()
     return {"status": "cleared"}
+
+from server.models import ExperimentConfig
+
+@app.post("/experiment/config/")
+def save_experiment_config(config: dict, db: Session = Depends(get_db)):
+    # Удаляем старый конфиг и сохраняем новый
+    db.query(ExperimentConfig).delete()
+    db.add(ExperimentConfig(config=config))
+    db.commit()
+    return {"status": "saved"}
+
+@app.get("/experiment/config/")
+def get_experiment_config(db: Session = Depends(get_db)):
+    row = db.query(ExperimentConfig).order_by(ExperimentConfig.id.desc()).first()
+    if row is None:
+        return {}
+    return row.config

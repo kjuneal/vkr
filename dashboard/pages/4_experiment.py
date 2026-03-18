@@ -12,7 +12,7 @@ from data_generate import generate_data
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from api import reset_experiment, show_alerts
+from api import reset_experiment, show_alerts, save_experiment_config
 from sqlalchemy.engine import URL
 from sqlalchemy import create_engine, text
 
@@ -317,6 +317,38 @@ if st.button("🚀 Начать эксперимент", type="primary", use_con
         if "error" in result:
             st.error(f"Ошибка очистки: {result['error']}")
             st.stop()
+        
+        st.write("💾 Сохранение параметров эксперимента...")
+        config = {
+            "mu": mu, "sigma": sigma,
+            "sources": {
+                "source_a": {
+                    "n": n_a,
+                    "degradation": deg_type_a,
+                    "deg_start": deg_start_a,
+                    "deg_value": deg_val_a,
+                    "metrics": selected_a,
+                    "label": DEGRADATION_OPTIONS[deg_type_a]
+                },
+                "source_b": {
+                    "n": n_b,
+                    "degradation": deg_type_b,
+                    "deg_start": deg_start_b,
+                    "deg_value": deg_val_b,
+                    "metrics": selected_b,
+                    "label": DEGRADATION_OPTIONS[deg_type_b]
+                },
+                "source_c": {
+                    "n": n_c,
+                    "degradation": deg_type_c,
+                    "deg_start": deg_start_c,
+                    "deg_value": deg_val_c,
+                    "metrics": selected_c,
+                    "label": DEGRADATION_OPTIONS[deg_type_c]
+                },
+            }
+        }
+        save_experiment_config(config)
 
         # 2. Генерация данных
         st.write("⚙️ Генерация данных для источника A...")
