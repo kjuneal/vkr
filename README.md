@@ -65,8 +65,8 @@ vkr/
 
 ### 1. Требования
 
-- Python 3.11+
-- PostgreSQL 15+
+- Python 3.13+
+- PostgreSQL 18+
 
 ### 2. Установка зависимостей
 
