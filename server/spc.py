@@ -36,7 +36,7 @@ class SPCState(Base):
     updated_at      = Column(DateTime, default=datetime.utcnow)
 
 
-BASELINE_SIZE = 5 #############   
+BASELINE_SIZE = 10 #############   5
 CUSUM_K       = 0.5
 CUSUM_H       = 5.0
 EWMA_LAMBDA   = 0.2

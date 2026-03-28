@@ -16,6 +16,109 @@ from api import reset_experiment, show_alerts, save_experiment_config
 from sqlalchemy.engine import URL
 from sqlalchemy import create_engine, text
 
+# Словарь пресетов 
+PRESETS = {
+    "1а — Сдвиг среднего (Δ=20)": {
+        "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
+        "n_a": 800, "deg_type_a": "mean_shift", "deg_start_a": 200, "deg_val_a": 20.0,
+        "n_b": 800, "deg_type_b": "mean_shift", "deg_start_b": 200, "deg_val_b": 20.0,
+        "n_c": 800, "deg_type_c": "mean_shift", "deg_start_c": 200, "deg_val_c": 20.0,
+        "sel_a": ["mean","median","std","completeness","iqr"],
+        "sel_b": ["mean","median","std","completeness","iqr"],
+        "sel_c": ["mean","median","std","completeness","iqr"],
+    },
+    "1б — Рост дисперсии (Δσ=10)": {
+        "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
+        "n_a": 800, "deg_type_a": "variance", "deg_start_a": 200, "deg_val_a": 10.0,
+        "n_b": 800, "deg_type_b": "variance", "deg_start_b": 200, "deg_val_b": 10.0,
+        "n_c": 800, "deg_type_c": "variance", "deg_start_c": 200, "deg_val_c": 10.0,
+        "sel_a": ["mean","median","std","completeness","iqr"],
+        "sel_b": ["mean","median","std","completeness","iqr"],
+        "sel_c": ["mean","median","std","completeness","iqr"],
+    },
+    "1в — Постепенный дрейф (δ=0.3)": {
+        "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
+        "n_a": 800, "deg_type_a": "gradual_drift", "deg_start_a": 200, "deg_val_a": 0.3,
+        "n_b": 800, "deg_type_b": "gradual_drift", "deg_start_b": 200, "deg_val_b": 0.3,
+        "n_c": 800, "deg_type_c": "gradual_drift", "deg_start_c": 200, "deg_val_c": 0.3,
+        "sel_a": ["mean","median","std","completeness","iqr"],
+        "sel_b": ["mean","median","std","completeness","iqr"],
+        "sel_c": ["mean","median","std","completeness","iqr"],
+    },
+    "1г — Пропуски (30%)": {
+        "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
+        "n_a": 800, "deg_type_a": "missing", "deg_start_a": 200, "deg_val_a": 0.3,
+        "n_b": 800, "deg_type_b": "missing", "deg_start_b": 200, "deg_val_b": 0.3,
+        "n_c": 800, "deg_type_c": "missing", "deg_start_c": 200, "deg_val_c": 0.3,
+        "sel_a": ["mean","median","std","completeness","iqr"],
+        "sel_b": ["mean","median","std","completeness","iqr"],
+        "sel_c": ["mean","median","std","completeness","iqr"],
+    },
+    "1д — Случайные выбросы (15%)": {
+        "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
+        "n_a": 800, "deg_type_a": "spikes", "deg_start_a": 200, "deg_val_a": 0.15,
+        "n_b": 800, "deg_type_b": "spikes", "deg_start_b": 200, "deg_val_b": 0.15,
+        "n_c": 800, "deg_type_c": "spikes", "deg_start_c": 200, "deg_val_c": 0.15,
+        "sel_a": ["mean","median","std","completeness","iqr"],
+        "sel_b": ["mean","median","std","completeness","iqr"],
+        "sel_c": ["mean","median","std","completeness","iqr"],
+    },
+    "2а — Сдвиг 1σ (Δ=5)": {
+        "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
+        "n_a": 800, "deg_type_a": "mean_shift", "deg_start_a": 200, "deg_val_a": 5.0,
+        "n_b": 800, "deg_type_b": "mean_shift", "deg_start_b": 200, "deg_val_b": 5.0,
+        "n_c": 800, "deg_type_c": "mean_shift", "deg_start_c": 200, "deg_val_c": 5.0,
+        "sel_a": ["mean","median","std","completeness","iqr"],
+        "sel_b": ["mean","median","std","completeness","iqr"],
+        "sel_c": ["mean","median","std","completeness","iqr"],
+    },
+    "2б — Сдвиг 2σ (Δ=10)": {
+        "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
+        "n_a": 800, "deg_type_a": "mean_shift", "deg_start_a": 200, "deg_val_a": 10.0,
+        "n_b": 800, "deg_type_b": "mean_shift", "deg_start_b": 200, "deg_val_b": 10.0,
+        "n_c": 800, "deg_type_c": "mean_shift", "deg_start_c": 200, "deg_val_c": 10.0,
+        "sel_a": ["mean","median","std","completeness","iqr"],
+        "sel_b": ["mean","median","std","completeness","iqr"],
+        "sel_c": ["mean","median","std","completeness","iqr"],
+    },
+    "2в — Сдвиг 3σ (Δ=15)": {
+        "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
+        "n_a": 800, "deg_type_a": "mean_shift", "deg_start_a": 200, "deg_val_a": 15.0,
+        "n_b": 800, "deg_type_b": "mean_shift", "deg_start_b": 200, "deg_val_b": 15.0,
+        "n_c": 800, "deg_type_c": "mean_shift", "deg_start_c": 200, "deg_val_c": 15.0,
+        "sel_a": ["mean","median","std","completeness","iqr"],
+        "sel_b": ["mean","median","std","completeness","iqr"],
+        "sel_c": ["mean","median","std","completeness","iqr"],
+    },
+    "2г — Сдвиг 5σ (Δ=25)": {
+        "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
+        "n_a": 800, "deg_type_a": "mean_shift", "deg_start_a": 200, "deg_val_a": 25.0,
+        "n_b": 800, "deg_type_b": "mean_shift", "deg_start_b": 200, "deg_val_b": 25.0,
+        "n_c": 800, "deg_type_c": "mean_shift", "deg_start_c": 200, "deg_val_c": 25.0,
+        "sel_a": ["mean","median","std","completeness","iqr"],
+        "sel_b": ["mean","median","std","completeness","iqr"],
+        "sel_c": ["mean","median","std","completeness","iqr"],
+    },
+    "3а — Выбросы 10%": {
+        "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
+        "n_a": 800, "deg_type_a": "spikes", "deg_start_a": 200, "deg_val_a": 0.1,
+        "n_b": 800, "deg_type_b": "spikes", "deg_start_b": 200, "deg_val_b": 0.1,
+        "n_c": 800, "deg_type_c": "spikes", "deg_start_c": 200, "deg_val_c": 0.1,
+        "sel_a": ["mean","median","std","completeness","iqr"],
+        "sel_b": ["mean","median","std","completeness","iqr"],
+        "sel_c": ["mean","median","std","completeness","iqr"],
+    },
+    "3б — Выбросы 25%": {
+        "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
+        "n_a": 800, "deg_type_a": "spikes", "deg_start_a": 200, "deg_val_a": 0.25,
+        "n_b": 800, "deg_type_b": "spikes", "deg_start_b": 200, "deg_val_b": 0.25,
+        "n_c": 800, "deg_type_c": "spikes", "deg_start_c": 200, "deg_val_c": 0.25,
+        "sel_a": ["mean","median","std","completeness","iqr"],
+        "sel_b": ["mean","median","std","completeness","iqr"],
+        "sel_c": ["mean","median","std","completeness","iqr"],
+    },
+}
+
 # ── Константы ─────────────────────────────────────────────────────────────
 
 SERVER_URL  = "http://127.0.0.1:8000"
@@ -100,24 +203,61 @@ st.caption("Настройте параметры, нажмите «Начать
 
 st.divider()
 
+st.subheader("⚡ Быстрый запуск по пресету")
+col_p1, col_p2 = st.columns([3, 1])
+with col_p1:
+    preset_name = st.selectbox(
+        "Выбери пресет эксперимента",
+        options=["— выбрать —"] + list(PRESETS.keys()),
+        label_visibility="collapsed"
+    )
+with col_p2:
+    load_preset = st.button("Загрузить", type="secondary", use_container_width=True)
+
+if load_preset and preset_name != "— выбрать —":
+    pr = PRESETS[preset_name]
+    st.session_state.update({
+        "mu": pr["mu"], "sigma": pr["sigma"],
+        "window_size": pr["window_size"], "delay": pr["delay"],
+        "n_a": pr["n_a"], "deg_type_a": pr["deg_type_a"],
+        "deg_start_a": pr["deg_start_a"], "deg_val_a": pr["deg_val_a"],
+        "n_b": pr["n_b"], "deg_type_b": pr["deg_type_b"],
+        "deg_start_b": pr["deg_start_b"], "deg_val_b": pr["deg_val_b"],
+        "n_c": pr["n_c"], "deg_type_c": pr["deg_type_c"],
+        "deg_start_c": pr["deg_start_c"], "deg_val_c": pr["deg_val_c"],
+        "sel_a": pr["sel_a"], "sel_b": pr["sel_b"], "sel_c": pr["sel_c"],
+    })
+    st.success(f"Загружен пресет: {preset_name}")
+    st.rerun()
+
+st.divider()
+
 # Общие параметры
 st.subheader("⚙️ Общие параметры")
 col1, col2, col3 = st.columns(3)
 with col1:
     mu = st.number_input(
-        "Базовое среднее (μ)", value=100.0, step=1.0,
+        "Базовое среднее (μ)", 
+        step=1.0,
+        #value=st.session_state.get("mu", 100.0),  
+        key="mu", 
         help="Ожидаемое среднее значение данных в нормальном режиме. "
              "Например, 100 означает что данные будут генерироваться около этого значения."
     )
 with col2:
     sigma = st.number_input(
-        "Базовое стд. откл. (σ)", value=5.0, step=0.5, min_value=0.1,
+        "Базовое стд. откл. (σ)",
+        step=0.5, min_value=0.1,
+        value=st.session_state.get("sigma", 5.0),
+        key="sigma",
         help="Разброс данных в нормальном режиме. Чем больше σ, тем шире разброс. "
              "Рекомендуется: 3–10 для наглядного эксперимента."
     )
 with col3:
     window_size = st.number_input(
-        "Размер окна агента", value=20, step=5, min_value=5,
+        "Размер окна агента", step=5, min_value=5,
+        value=st.session_state.get("window_size", 20),
+        key="window_size",
         help="Сколько записей обрабатывает агент за один цикл. "
              "По этому окну вычисляются метрики (среднее, стд. откл., полнота). "
              "Меньше окно — больше точек на графике, но больше шума."
@@ -126,7 +266,9 @@ with col3:
 col4, _ = st.columns(2)
 with col4:
     delay = st.number_input(
-        "Задержка между окнами (сек)", value=1, step=1, min_value=0,
+        "Задержка между окнами (сек)", step=1, min_value=0,
+        value=st.session_state.get("delay", 0),
+        key="delay",
         help="Пауза между отправками метрик агентом. "
              "0 — максимальная скорость, 2–3 — удобно наблюдать в реальном времени."
     )
@@ -163,7 +305,9 @@ st.subheader("📦 Источник A — PostgreSQL")
 col1, col2 = st.columns(2)
 with col1:
     n_a = st.number_input(
-        "Записей в источнике A", value=200, step=50, min_value=50,
+        "Записей в источнике A", step=50, min_value=50,
+        value=st.session_state.get("n_a", 500),
+        key="n_a",
         help="Общее количество строк в таблице. "
              "Рекомендуется минимум 100 для корректной фазы I SPC + записи с деградацией."
     )
@@ -172,14 +316,18 @@ with col2:
         "Вид деградации",
         options=list(DEGRADATION_OPTIONS.keys()),
         format_func=lambda x: DEGRADATION_OPTIONS[x],
-        key="type_a"
+        index=list(DEGRADATION_OPTIONS.keys()).index(
+            st.session_state.get("deg_type_a", "none")
+        ),
+        key="deg_type_a"
     )
 
 col3, col4 = st.columns(2)
 with col3:
     deg_start_a = st.number_input(
-        "Начало деградации (запись №)", value=100, step=10,
-        min_value=0, max_value=n_a - 1, key="deg_a",
+        "Начало деградации (запись №)", step=10,
+        min_value=0, max_value=n_a - 1, key="deg_start_a",
+        value=st.session_state.get("deg_start_a", 200),
         help="С какой записи начинается рост дисперсии. "
              "Записи до этого момента используются системой для обучения (фаза I). "
              "Рекомендуется: не менее 5 × размер окна.", disabled=(deg_type_a == "none")
@@ -202,8 +350,9 @@ with col4:
 selected_a = st.multiselect(
     "Метрики источника A",
     options=list(ALL_METRICS.keys()),
-    default=["mean", "std"],
+    default=st.session_state.get("sel_a", ["mean", "std"]), #default=["mean", "std"],
     format_func=lambda x: ALL_METRICS[x],
+    key="sel_a",
     help="Какие метрики вычисляет агент A."
 )
 st.divider()
@@ -212,7 +361,9 @@ st.subheader("📦 Источник B — SQLite")
 col1, col2 = st.columns(2)
 with col1:
     n_b = st.number_input(
-        "Записей в источнике B", value=200, step=50, min_value=50,
+        "Записей в источнике B", step=50, min_value=50,
+        value=st.session_state.get("n_b", 500),
+        key="n_b",
         help="Общее количество строк. Аналогично источнику A."
     )
 with col2:
@@ -220,14 +371,17 @@ with col2:
         "Вид деградации",
         options=list(DEGRADATION_OPTIONS.keys()),
         format_func=lambda x: DEGRADATION_OPTIONS[x],
-        index=3,  # по умолчанию "missing"
-        key="type_b"
+        index=list(DEGRADATION_OPTIONS.keys()).index(
+            st.session_state.get("deg_type_b", "none")
+        ),
+        key="deg_type_b"
     )
 col3, col4 = st.columns(2)
 with col3:
     deg_start_b = st.number_input(
-        "Начало деградации (запись №)", value=100, step=10,
-        min_value=0, max_value=n_b - 1, key="deg_b",
+        "Начало деградации (запись №)", step=10,
+        min_value=0, max_value=n_b - 1, key="deg_start_b",
+        value=st.session_state.get("deg_start_b", 200),
         help="С какой записи начинают появляться пропущенные значения (NULL). "
              "До этой записи данные полные (полнота = 1.0).", disabled=(deg_type_b == "none")
     )
@@ -249,8 +403,9 @@ with col4:
 selected_b = st.multiselect(
     "Метрики источника B",
     options=list(ALL_METRICS.keys()),
-    default=["completeness", "mean"],
+    default=st.session_state.get("sel_b", ["completeness", "mean"]), #default=["completeness", "mean"],
     format_func=lambda x: ALL_METRICS[x],
+    key="sel_b",
     help="Какие метрики вычисляет агент B."
 )
 st.divider()
@@ -259,7 +414,10 @@ st.subheader("📦 Источник C — CSV")
 col1, col2 = st.columns(2)
 with col1:
     n_c = st.number_input(
-        "Записей в источнике C", value=200, step=50, min_value=50,
+        "Записей в источнике C",
+        step=50, min_value=50,
+        value=st.session_state.get("n_c", 500),
+        key="n_c",
         help="Общее количество строк. Аналогично источнику A."
     )
 with col2:
@@ -267,14 +425,17 @@ with col2:
         "Вид деградации",
         options=list(DEGRADATION_OPTIONS.keys()),
         format_func=lambda x: DEGRADATION_OPTIONS[x],
-        index=1,  # по умолчанию "mean_shift"
-        key="type_c"
+        index=list(DEGRADATION_OPTIONS.keys()).index(
+            st.session_state.get("deg_type_c", "none")
+        ),
+        key="deg_type_c"
     )
 col3, col4 = st.columns(2)   
 with col3:
     deg_start_c = st.number_input(
-        "Начало деградации (запись №)", value=100, step=10,
-        min_value=0, max_value=n_c - 1, key="deg_c",
+        "Начало деградации (запись №)", step=10,
+        min_value=0, max_value=n_c - 1, key="deg_start_c",
+        value=st.session_state.get("deg_start_c", 200),
         help="С какой записи среднее значение начнёт смещаться. "
              "До этой записи данные генерируются с базовым μ.", disabled=(deg_type_c == "none")
     )
@@ -297,8 +458,9 @@ with col4:
 selected_c = st.multiselect(
     "Метрики источника C",
     options=list(ALL_METRICS.keys()),
-    default=["mean", "std", "median"],
+    default=st.session_state.get("sel_c", ["mean", "std", "median"]), #default=["mean", "std", "median"],
     format_func=lambda x: ALL_METRICS[x],
+    key="sel_c",
     help="Какие метрики вычисляет агент C."
 )
 
