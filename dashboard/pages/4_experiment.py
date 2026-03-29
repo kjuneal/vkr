@@ -338,7 +338,7 @@ with col4:
         deg_val_a = 0.0
         st.number_input(param_label if deg_type_a != "none" else "Параметр", value=0.0, disabled=True)
     else:
-        deg_val_a = st.number_input(param_label, value=param_default, step=0.1, help=param_help, key="val_a")
+        deg_val_a = st.number_input(param_label, value=param_default, step=0.1, help=param_help, key="deg_val_a")
 
     # deg_val_a = st.number_input(
     #     "Доп. σ при росте дисперсии", value=10.0, step=1.0, min_value=0.0,
@@ -391,7 +391,7 @@ with col4:
         deg_val_b = 0.0
         st.number_input("Параметр", value=0.0, disabled=True, key="val_b_dis")
     else:
-        deg_val_b = st.number_input(param_label, value=param_default, step=0.1, help=param_help, key="val_b")
+        deg_val_b = st.number_input(param_label, value=param_default, step=0.1, help=param_help, key="deg_val_b")
         
     # deg_val_b = st.slider(
     #     "Доля пропусков", min_value=0.0, max_value=0.5, value=0.2, step=0.05,
@@ -445,7 +445,7 @@ with col4:
         deg_val_c = 0.0
         st.number_input("Параметр", value=0.0, disabled=True, key="val_c_dis")
     else:
-        deg_val_c = st.number_input(param_label, value=param_default, step=0.1, help=param_help, key="val_c")
+        deg_val_c = st.number_input(param_label, value=param_default, step=0.1, help=param_help, key="deg_val_c")
 
 
     # deg_val_c = st.number_input(

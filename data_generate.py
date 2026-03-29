@@ -22,15 +22,38 @@ def add_variance_increase(df, extra_sigma=10, start_index=120):
     df.loc[start_index:, "value"] += noise
     return df
 
-def add_missing_values(df, missing_ratio=0.2, start_index=120):
-    df = df.copy() 
-    n = len(df) - start_index
-    missing_indices = np.random.choice(
-        df.index[start_index:],
-        int(n * missing_ratio),
-        replace=False
-    )
-    df.loc[missing_indices, "value"] = np.nan
+# def add_missing_values(df, missing_ratio=0.2, start_index=120):
+#     df = df.copy() 
+#     n = len(df) - start_index
+#     missing_indices = np.random.choice(
+#         df.index[start_index:],
+#         int(n * missing_ratio),
+#         replace=False
+#     )
+#     df.loc[missing_indices, "value"] = np.nan
+#     return df
+
+def add_missing_values(df: pd.DataFrame, missing_ratio: float, start_index: int = 0) -> pd.DataFrame:
+    """Добавляет пропуски в значения с заданной вероятностью после start_index"""
+    df = df.copy()
+    
+    n = len(df)
+    available_indices = df.index[start_index:]
+    n_available = len(available_indices)
+    n_missing = int(n_available * missing_ratio)  # Исправлено: от доступных строк
+    
+    # Защита от ошибки выборки
+    n_to_sample = min(n_missing, n_available)
+    if n_to_sample > 0:
+        missing_indices = np.random.choice(
+            available_indices,
+            n_to_sample,
+            replace=False
+        )
+        df.loc[missing_indices, 'value'] = np.nan
+    else:
+        print(f"Предупреждение: пропуски не добавлены (n_missing={n_missing}, n_available={n_available})")
+    
     return df
 
 def add_gradual_drift(df, drift_per_step=0.5, start_index=120):
