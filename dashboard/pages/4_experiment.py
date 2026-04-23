@@ -300,6 +300,60 @@ def http_check(url):
     except Exception as e:
         print(f"❌ {url}: {e}")
         return float('nan')
+    
+def live_agent_loop(source_key, url, csv_path, stop_event, window_size, interval, selected_metrics):
+    """
+    Один поток на источник:
+    1. Опрашивает URL каждые interval секунд
+    2. Пишет результат в CSV
+    3. Когда накопилось window_size новых записей — считает метрики и отправляет на сервер
+    """
+    import sys, os
+    sys.path.insert(0, ROOT)
+    os.environ["PGCLIENTENCODING"] = "UTF8"
+
+    from agents.base_agent import BaseAgent, compute_metrics
+    import pandas as pd
+    import numpy as np
+
+    agent = BaseAgent(SERVER_URL)
+    csv_path.parent.mkdir(exist_ok=True)
+
+    buffer = []        # накапливаем записи до размера окна
+    sent_windows = 0
+
+    while not stop_event.is_set():
+        # 1. Опрашиваем хост
+        latency = http_check(url)
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+        value = latency if not (isinstance(latency, float) and pd.isna(latency)) else float('nan')
+
+        # 2. Пишем в CSV (общий лог)
+        new_row = pd.DataFrame([{'timestamp': timestamp, 'value': value}])
+        if csv_path.exists():
+            new_row.to_csv(csv_path, mode='a', header=False, index=False)
+        else:
+            new_row.to_csv(csv_path, index=False)
+
+        # 3. Добавляем в буфер
+        buffer.append(value)
+
+        # 4. Когда буфер заполнен — считаем метрики и отправляем
+        if len(buffer) >= window_size:
+            series = pd.Series(buffer)
+            metrics = compute_metrics(series, selected_metrics)
+
+            source_name = f"source_{source_key}"
+            agent.send_metrics(source_name, metrics)
+
+            sent_windows += 1
+            print(f"[Live {source_key.upper()}] окно {sent_windows}: {metrics}")
+
+            buffer = []  # сбрасываем буфер
+
+        # 5. Ждём до следующего опроса
+        time_module.sleep(interval)
 
 # ─── ПИНГ ФУНКЦИИ ───
 def ping_once(host="8.8.8.8"):
@@ -387,265 +441,431 @@ def file_block(source_key):
 
 st.divider()
 
+# if data_mode == "Живой мониторинг пинга":
+#     st.markdown("---")
+
+#     # Инициализация состояния
+#     if 'monitoring_active' not in st.session_state:
+#         st.session_state.monitoring_active = False
+#         st.session_state.agents_started = False
+#         st.session_state.agent_status = {"a": "⏳ не запущен", "b": "⏳ не запущен", "c": "⏳ не запущен"}
+#         st.session_state.windows_processed = {"a": 0, "b": 0, "c": 0}
+#         st.session_state.ping_threads = {}
+#         st.session_state.stop_events = {}
+    
+#     # 3 источника с настройками
+#     col1, col2, col3 = st.columns(3)
+    
+#     with col1:
+#         st.markdown("### 📦 Источник A")
+#         host_a = st.selectbox("Хост A", options=list(HTTP_HOSTS.keys()), 
+#                             format_func=lambda x: f"{x} ({HTTP_HOSTS[x]})", key="host_a")
+#         metrics_a = metrics_block('a', ['mean', 'std'])
+
+#     with col2:
+#         st.markdown("### 📦 Источник B") 
+#         host_b = st.selectbox("Хост B", options=list(HTTP_HOSTS.keys()), 
+#                             format_func=lambda x: f"{x} ({HTTP_HOSTS[x]})", key="host_b")
+#         metrics_b = metrics_block('b', ['completeness', 'iqr'])
+
+#     with col3:
+#         st.markdown("### 📦 Источник C")
+#         host_c = st.selectbox("Хост C", options=list(HTTP_HOSTS.keys()), 
+#                             format_func=lambda x: f"{x} ({HTTP_HOSTS[x]})", key="host_c")
+#         metrics_c = metrics_block('c', ['mean', 'std'])
+
+#     # 
+#     window_size = st.number_input("Размер окна агента", value=20, min_value=5, key="live_window")
+#     delay = st.number_input("Задержка агентов (сек)", value=0, min_value=0, key="live_delay")
+
+#     # Пути к файлам
+#     csv_paths = {
+#         'a': Path("data/ping_a_live.csv"),
+#         'b': Path("data/ping_b_live.csv"), 
+#         'c': Path("data/ping_c_live.csv")
+#     }
+#     st.session_state.csv_paths = csv_paths
+
+    
+
+#     # # Инициализация потоков
+#     # if 'ping_threads' not in st.session_state:
+#     #     st.session_state.ping_threads = {}
+#     #     st.session_state.stop_events = {}
+#     #     st.session_state.csv_paths = {
+#     #         'a': Path("data/ping_a_live.csv"),
+#     #         'b': Path("data/ping_b_live.csv"), 
+#     #         'c': Path("data/ping_c_live.csv")
+#     #     }
+
+#     # Кнопки управления
+#     col_btn1, col_btn2, col_clear = st.columns([2,2,1])
+
+    
+#     with col_btn1:
+#         if st.button("🚀 Запустить мониторинг всех хостов", type="primary", disabled=st.session_state.monitoring_active):
+#             # Очистка старых файлов
+#             for source in ['a', 'b', 'c']:
+#                 csv_path = st.session_state.csv_paths[source]
+#                 if csv_path.exists():
+#                     csv_path.unlink()
+            
+#             #запуск потоков
+#             for source, host_name in [('a', host_a), ('b', host_b), ('c', host_c)]:
+#                 csv_path = st.session_state.csv_paths[source]
+                
+#                 # Останавливаем старый поток если есть
+#                 if source in st.session_state.stop_events:
+#                     st.session_state.stop_events[source].set()
+                
+#                 # Создаём новый флаг и поток
+#                 stop_event = threading.Event()
+#                 st.session_state.stop_events[source] = stop_event
+                
+#                 thread = threading.Thread(
+#                     target=ping_loop,
+#                     args=(HTTP_HOSTS[host_name], csv_path, stop_event, 2),
+#                     daemon=True
+#                 )
+#                 st.session_state.ping_threads[source] = thread
+#                 thread.start()
+
+#             st.session_state.monitoring_active = True
+#             st.session_state.agents_started = False
+#             st.success("🟢 Мониторинг запущен! Данные собираются каждые 2 секунды.")
+#             st.rerun()
+
+#     with col_btn2:
+#         if st.button("⏹️ Остановить все потоки", disabled=not st.session_state.monitoring_active):
+#             for source in ['a', 'b', 'c']:
+#                 if source in st.session_state.get('stop_events', {}):
+#                     st.session_state.stop_events[source].set()
+#             st.session_state.monitoring_active = False
+#             st.success("🛑 Мониторинг остановлен!")
+#             st.rerun()
+
+#     with col_clear: 
+#         if st.button("🗑️ Очистить файлы", type="secondary"):
+#             for source in ['a','b','c']:
+#                 if source in st.session_state.get('stop_events', {}):
+#                     st.session_state.stop_events[source].set()
+#                 csv_path = csv_paths[source]
+#                 if csv_path.exists():
+#                     csv_path.unlink()
+#             st.session_state.monitoring_active = False
+#             st.session_state.agents_started = False
+#             st.session_state.ping_threads = {}
+#             st.session_state.stop_events = {}
+#             st.success("🗑️ Файлы очищены и мониторинг остановлен!")
+#             st.rerun()
+
+#     # Статус всех источников
+#     st.markdown("### 📊 Статус сбора данных")
+#     status_cols = st.columns(3)
+    
+#     total_points = 0
+#     ready_for_agents = True
+    
+#     for i, source in enumerate(['a','b','c']):
+#         csv_path = st.session_state.csv_paths[source]
+#         with status_cols[i]:
+#             if csv_path.exists():
+#                 try:
+#                     df = pd.read_csv(csv_path)
+#                     count = len(df)
+#                     valid_count = len(df.dropna(subset=['value']))
+#                     total_points += count
+#                     latest = df['value'].iloc[-1] if len(df) > 0 else float('nan')
+                    
+#                     st.metric(f"📦 {source.upper()}", f"{count} точек", f"{valid_count}/{count}")
+#                     st.text(f"Последняя: {latest:.1f}ms")
+#                     st.line_chart(df.set_index('timestamp')['value'], height=150)
+                    
+#                     if count < 30:
+#                         ready_for_agents = False
+                        
+#                 except Exception as e:
+#                     st.metric(f"📦 {source.upper()}", "Ошибка файла", "❌")
+#                     st.error(f"{e}")
+#                     ready_for_agents = False
+#             else:
+#                 st.metric(f"📦 {source.upper()}", "0 точек", "⏳ ждём...")
+#                 ready_for_agents = False
+
+#     # if st.session_state.monitoring_active:
+#     #     col_refresh, col_status = st.columns([1, 3])
+#     #     with col_refresh:
+#     #         if st.button("🔄 Обновить сейчас", key="refresh_live"):
+#     #             st.rerun()
+#     #     with col_status:
+#     #         st.info(f"📊 Точек: **{total_points}/90** | Агенты: {'✅ готовы' if total_points>=90 else '⏳ собираем'}")
+
+#     # КНОПКА "Обновить" с копированием и агентами
+#     col_manual, col_progress = st.columns([3, 1])
+#     with col_progress:
+#         if st.button("🔄 Обновить и запустить агентов", disabled=st.session_state.agents_started):
+#             st.session_state.force_agent_run = True
+
+#     # Логика запуска агентов (каждый раз при force_agent_run)
+#     if (st.session_state.monitoring_active and 
+#         total_points >= 30 and 
+#         (st.session_state.get('force_agent_run', False) or 
+#         (not st.session_state.agents_started and total_points >= 90))):
+
+#         st.markdown("### 🤖 Запуск агентов...")
+        
+#         # КОПИРУЕМ НОВЫЕ ДАННЫЕ В БД (каждый раз!)
+#         with st.status("📤 Копирование свежих данных...", expanded=False):
+#             for source in ['a','b','c']:
+#                 csv_path = st.session_state.csv_paths[source]
+#                 if csv_path.exists():
+#                     df_live = pd.read_csv(csv_path)
+#                     print(f"DEBUG: копирую {len(df_live)} точек из {csv_path}")
+#                     if source == 'a':
+#                         load_to_postgres(df_live, PG_DB_NAME)
+#                     elif source == 'b':
+#                         load_to_sqlite(df_live, SQLITE_PATH)
+#                     else:
+#                         load_to_csv(df_live, CSV_PATH)
+    
+#         # Запуск агентов
+#         status_dict = {"a": "⏳", "b": "⏳", "c": "⏳"}
+#         t_a = threading.Thread(target=run_agent_a, args=(window_size, 0, metrics_a, status_dict))
+#         t_b = threading.Thread(target=run_agent_b, args=(window_size, 0, metrics_b, status_dict))
+#         t_c = threading.Thread(target=run_agent_c, args=(window_size, 0, metrics_c, status_dict))
+        
+#         t_a.start(); t_b.start(); t_c.start()
+        
+#         progress = st.progress(0)
+#         step = 0
+#         while any([t_a.is_alive(), t_b.is_alive(), t_c.is_alive()]):
+#             step += 1
+#             progress.progress(min(1.0, step/20))
+#             time.sleep(0.5)
+        
+#         t_a.join(); t_b.join(); t_c.join()
+        
+#         st.success(f"✅ Агенты обновили дашборд! Окна: A={status_dict['a']}, B={status_dict['b']}, C={status_dict['c']}")
+        
+#         if st.session_state.get('force_agent_run'):
+#             del st.session_state.force_agent_run
+#         st.session_state.agents_started = True
+#         st.rerun()
+
+#     # автозапуск агентов
+#     if (st.session_state.monitoring_active and 
+#     total_points >= 90 and 
+#     not st.session_state.agents_started and 
+#     ready_for_agents):
+
+#         st.markdown("### 🤖 🚀 АВТОЗАПУСК АГЕНТОВ")
+#         st.success("✅ 90+ точек! Копирую данные и запускаю агентов...")
+        
+#         # Копируем в основные источники
+#         with st.status("📤 Загрузка в PostgreSQL/SQLite/CSV...", expanded=True):
+#             for source in ['a','b','c']:
+#                 csv_path = st.session_state.csv_paths[source]
+#                 if csv_path.exists():
+#                     df_live = pd.read_csv(csv_path)
+#                     if source == 'a':
+#                         load_to_postgres(df_live, PG_DB_NAME)
+#                     elif source == 'b':
+#                         load_to_sqlite(df_live, SQLITE_PATH)
+#                     else:
+#                         load_to_csv(df_live, CSV_PATH)
+#                     st.write(f"✅ {source.upper()}: {len(df_live)} точек загружено")
+
+#         # Запуск агентов
+#         st.session_state.agents_started = True
+#         status_dict = {"a": "⏳ запускается", "b": "⏳ запускается", "c": "⏳ запускается"}
+        
+#         t_a = threading.Thread(target=run_agent_a, args=(window_size, st.session_state.live_delay, metrics_a, status_dict))
+#         t_b = threading.Thread(target=run_agent_b, args=(window_size, st.session_state.live_delay, metrics_b, status_dict))
+#         t_c = threading.Thread(target=run_agent_c, args=(window_size, st.session_state.live_delay, metrics_c, status_dict))
+        
+#         t_a.start(); t_b.start(); t_c.start()
+        
+#         progress = st.progress(0, text="Агенты анализируют...")
+#         step = 0
+        
+#         while any([t_a.is_alive(), t_b.is_alive(), t_c.is_alive()]):
+#             step += 1
+#             progress.progress(min(1.0, step/30))
+#             time.sleep(0.5)  # Небольшая пауза
+        
+#         t_a.join(); t_b.join(); t_c.join()
+#         status_dict.update({"a": "✅ завершён", "b": "✅ завершён", "c": "✅ завершён"})
+#         progress.progress(1.0, text="✅ Агенты завершили анализ!")
+        
+#         st.balloons()
+#         st.success("🎉 Live-данные на дашборде! Перейди посмотреть!")
+#         st.rerun()
+
 if data_mode == "Живой мониторинг пинга":
-    st.markdown("---")
 
     # Инициализация состояния
-    if 'monitoring_active' not in st.session_state:
-        st.session_state.monitoring_active = False
-        st.session_state.agents_started = False
-        st.session_state.agent_status = {"a": "⏳ не запущен", "b": "⏳ не запущен", "c": "⏳ не запущен"}
-        st.session_state.windows_processed = {"a": 0, "b": 0, "c": 0}
-        st.session_state.ping_threads = {}
-        st.session_state.stop_events = {}
-    
-    # 3 источника с настройками
+    for key, default in [
+        ('live_running', False),
+        ('ping_threads', {}),
+        ('stop_events', {}),
+        ('csv_paths', {
+            'a': Path("data/ping_a_live.csv"),
+            'b': Path("data/ping_b_live.csv"),
+            'c': Path("data/ping_c_live.csv")
+        }),
+    ]:
+        if key not in st.session_state:
+            st.session_state[key] = default
+
+    # Настройки
     col1, col2, col3 = st.columns(3)
-    
     with col1:
         st.markdown("### 📦 Источник A")
-        host_a = st.selectbox("Хост A", options=list(HTTP_HOSTS.keys()), 
-                            format_func=lambda x: f"{x} ({HTTP_HOSTS[x]})", key="host_a")
+        host_a = st.selectbox("Хост A", options=list(HTTP_HOSTS.keys()),
+                              format_func=lambda x: f"{x}", key="host_a")
         metrics_a = metrics_block('a', ['mean', 'std'])
-
     with col2:
-        st.markdown("### 📦 Источник B") 
-        host_b = st.selectbox("Хост B", options=list(HTTP_HOSTS.keys()), 
-                            format_func=lambda x: f"{x} ({HTTP_HOSTS[x]})", key="host_b")
-        metrics_b = metrics_block('b', ['completeness', 'iqr'])
-
+        st.markdown("### 📦 Источник B")
+        host_b = st.selectbox("Хост B", options=list(HTTP_HOSTS.keys()),
+                              format_func=lambda x: f"{x}", key="host_b")
+        metrics_b = metrics_block('b', ['mean', 'iqr'])
     with col3:
         st.markdown("### 📦 Источник C")
-        host_c = st.selectbox("Хост C", options=list(HTTP_HOSTS.keys()), 
-                            format_func=lambda x: f"{x} ({HTTP_HOSTS[x]})", key="host_c")
+        host_c = st.selectbox("Хост C", options=list(HTTP_HOSTS.keys()),
+                              format_func=lambda x: f"{x}", key="host_c")
         metrics_c = metrics_block('c', ['mean', 'std'])
 
-    # 
-    window_size = st.number_input("Размер окна агента", value=20, min_value=5, key="live_window")
-    delay = st.number_input("Задержка агентов (сек)", value=0, min_value=0, key="live_delay")
+    col_w, col_d = st.columns(2)
+    with col_w:
+        live_window = st.number_input(
+            "Размер окна (записей)", value=10, min_value=3, key="live_window",
+            help="Когда накопится столько записей — агент считает метрики и отправляет на сервер"
+        )
+    with col_d:
+        live_interval = st.number_input(
+            "Интервал опроса (сек)", value=3, min_value=1, key="live_interval",
+            help="Как часто опрашивать каждый хост"
+        )
 
-    # Пути к файлам
-    csv_paths = {
-        'a': Path("data/ping_a_live.csv"),
-        'b': Path("data/ping_b_live.csv"), 
-        'c': Path("data/ping_c_live.csv")
-    }
-    st.session_state.csv_paths = csv_paths
-
-    
-
-    # # Инициализация потоков
-    # if 'ping_threads' not in st.session_state:
-    #     st.session_state.ping_threads = {}
-    #     st.session_state.stop_events = {}
-    #     st.session_state.csv_paths = {
-    #         'a': Path("data/ping_a_live.csv"),
-    #         'b': Path("data/ping_b_live.csv"), 
-    #         'c': Path("data/ping_c_live.csv")
-    #     }
+    st.divider()
 
     # Кнопки управления
-    col_btn1, col_btn2, col_clear = st.columns([2,2,1])
+    col_start, col_stop, col_clear = st.columns([2, 2, 1])
+    with col_start:
+        start_clicked = st.button(
+            "🚀 Начать мониторинг",
+            type="primary",
+            disabled=st.session_state.live_running,
+            use_container_width=True
+        )
+    with col_stop:
+        stop_clicked = st.button(
+            "⏹️ Остановить",
+            disabled=not st.session_state.live_running,
+            use_container_width=True
+        )
+    with col_clear:
+        clear_clicked = st.button("🗑️ Сбросить", use_container_width=True)
 
-    
-    with col_btn1:
-        if st.button("🚀 Запустить мониторинг всех хостов", type="primary", disabled=st.session_state.monitoring_active):
-            # Очистка старых файлов
-            for source in ['a', 'b', 'c']:
-                csv_path = st.session_state.csv_paths[source]
-                if csv_path.exists():
-                    csv_path.unlink()
-            
-            #запуск потоков
-            for source, host_name in [('a', host_a), ('b', host_b), ('c', host_c)]:
-                csv_path = st.session_state.csv_paths[source]
-                
-                # Останавливаем старый поток если есть
-                if source in st.session_state.stop_events:
-                    st.session_state.stop_events[source].set()
-                
-                # Создаём новый флаг и поток
-                stop_event = threading.Event()
-                st.session_state.stop_events[source] = stop_event
-                
-                thread = threading.Thread(
-                    target=ping_loop,
-                    args=(HTTP_HOSTS[host_name], csv_path, stop_event, 2),
-                    daemon=True
-                )
-                st.session_state.ping_threads[source] = thread
-                thread.start()
-
-            st.session_state.monitoring_active = True
-            st.session_state.agents_started = False
-            st.success("🟢 Мониторинг запущен! Данные собираются каждые 2 секунды.")
-            st.rerun()
-
-    with col_btn2:
-        if st.button("⏹️ Остановить все потоки", disabled=not st.session_state.monitoring_active):
-            for source in ['a', 'b', 'c']:
-                if source in st.session_state.get('stop_events', {}):
-                    st.session_state.stop_events[source].set()
-            st.session_state.monitoring_active = False
-            st.success("🛑 Мониторинг остановлен!")
-            st.rerun()
-
-    with col_clear: 
-        if st.button("🗑️ Очистить файлы", type="secondary"):
-            for source in ['a','b','c']:
-                if source in st.session_state.get('stop_events', {}):
-                    st.session_state.stop_events[source].set()
-                csv_path = csv_paths[source]
-                if csv_path.exists():
-                    csv_path.unlink()
-            st.session_state.monitoring_active = False
-            st.session_state.agents_started = False
-            st.session_state.ping_threads = {}
-            st.session_state.stop_events = {}
-            st.success("🗑️ Файлы очищены и мониторинг остановлен!")
-            st.rerun()
-
-    # Статус всех источников
-    st.markdown("### 📊 Статус сбора данных")
-    status_cols = st.columns(3)
-    
-    total_points = 0
-    ready_for_agents = True
-    
-    for i, source in enumerate(['a','b','c']):
-        csv_path = st.session_state.csv_paths[source]
-        with status_cols[i]:
-            if csv_path.exists():
-                try:
-                    df = pd.read_csv(csv_path)
-                    count = len(df)
-                    valid_count = len(df.dropna(subset=['value']))
-                    total_points += count
-                    latest = df['value'].iloc[-1] if len(df) > 0 else float('nan')
-                    
-                    st.metric(f"📦 {source.upper()}", f"{count} точек", f"{valid_count}/{count}")
-                    st.text(f"Последняя: {latest:.1f}ms")
-                    st.line_chart(df.set_index('timestamp')['value'], height=150)
-                    
-                    if count < 30:
-                        ready_for_agents = False
-                        
-                except Exception as e:
-                    st.metric(f"📦 {source.upper()}", "Ошибка файла", "❌")
-                    st.error(f"{e}")
-                    ready_for_agents = False
-            else:
-                st.metric(f"📦 {source.upper()}", "0 точек", "⏳ ждём...")
-                ready_for_agents = False
-
-    # if st.session_state.monitoring_active:
-    #     col_refresh, col_status = st.columns([1, 3])
-    #     with col_refresh:
-    #         if st.button("🔄 Обновить сейчас", key="refresh_live"):
-    #             st.rerun()
-    #     with col_status:
-    #         st.info(f"📊 Точек: **{total_points}/90** | Агенты: {'✅ готовы' if total_points>=90 else '⏳ собираем'}")
-
-    # КНОПКА "Обновить" с копированием и агентами
-    col_manual, col_progress = st.columns([3, 1])
-    with col_progress:
-        if st.button("🔄 Обновить и запустить агентов", disabled=st.session_state.agents_started):
-            st.session_state.force_agent_run = True
-
-    # Логика запуска агентов (каждый раз при force_agent_run)
-    if (st.session_state.monitoring_active and 
-        total_points >= 30 and 
-        (st.session_state.get('force_agent_run', False) or 
-        (not st.session_state.agents_started and total_points >= 90))):
-
-        st.markdown("### 🤖 Запуск агентов...")
-        
-        # КОПИРУЕМ НОВЫЕ ДАННЫЕ В БД (каждый раз!)
-        with st.status("📤 Копирование свежих данных...", expanded=False):
-            for source in ['a','b','c']:
-                csv_path = st.session_state.csv_paths[source]
-                if csv_path.exists():
-                    df_live = pd.read_csv(csv_path)
-                    print(f"DEBUG: копирую {len(df_live)} точек из {csv_path}")
-                    if source == 'a':
-                        load_to_postgres(df_live, PG_DB_NAME)
-                    elif source == 'b':
-                        load_to_sqlite(df_live, SQLITE_PATH)
-                    else:
-                        load_to_csv(df_live, CSV_PATH)
-    
-        # Запуск агентов
-        status_dict = {"a": "⏳", "b": "⏳", "c": "⏳"}
-        t_a = threading.Thread(target=run_agent_a, args=(window_size, 0, metrics_a, status_dict))
-        t_b = threading.Thread(target=run_agent_b, args=(window_size, 0, metrics_b, status_dict))
-        t_c = threading.Thread(target=run_agent_c, args=(window_size, 0, metrics_c, status_dict))
-        
-        t_a.start(); t_b.start(); t_c.start()
-        
-        progress = st.progress(0)
-        step = 0
-        while any([t_a.is_alive(), t_b.is_alive(), t_c.is_alive()]):
-            step += 1
-            progress.progress(min(1.0, step/20))
-            time.sleep(0.5)
-        
-        t_a.join(); t_b.join(); t_c.join()
-        
-        st.success(f"✅ Агенты обновили дашборд! Окна: A={status_dict['a']}, B={status_dict['b']}, C={status_dict['c']}")
-        
-        if st.session_state.get('force_agent_run'):
-            del st.session_state.force_agent_run
-        st.session_state.agents_started = True
+    if clear_clicked:
+        # Останавливаем всё
+        for src in ['a', 'b', 'c']:
+            if src in st.session_state.stop_events:
+                st.session_state.stop_events[src].set()
+        for path in st.session_state.csv_paths.values():
+            if path.exists():
+                path.unlink()
+        # Очищаем БД
+        reset_experiment()
+        st.session_state.live_running = False
+        st.session_state.ping_threads = {}
+        st.session_state.stop_events = {}
+        st.success("Сброшено!")
         st.rerun()
 
-    # автозапуск агентов
-    if (st.session_state.monitoring_active and 
-    total_points >= 90 and 
-    not st.session_state.agents_started and 
-    ready_for_agents):
-
-        st.markdown("### 🤖 🚀 АВТОЗАПУСК АГЕНТОВ")
-        st.success("✅ 90+ точек! Копирую данные и запускаю агентов...")
-        
-        # Копируем в основные источники
-        with st.status("📤 Загрузка в PostgreSQL/SQLite/CSV...", expanded=True):
-            for source in ['a','b','c']:
-                csv_path = st.session_state.csv_paths[source]
-                if csv_path.exists():
-                    df_live = pd.read_csv(csv_path)
-                    if source == 'a':
-                        load_to_postgres(df_live, PG_DB_NAME)
-                    elif source == 'b':
-                        load_to_sqlite(df_live, SQLITE_PATH)
-                    else:
-                        load_to_csv(df_live, CSV_PATH)
-                    st.write(f"✅ {source.upper()}: {len(df_live)} точек загружено")
-
-        # Запуск агентов
-        st.session_state.agents_started = True
-        status_dict = {"a": "⏳ запускается", "b": "⏳ запускается", "c": "⏳ запускается"}
-        
-        t_a = threading.Thread(target=run_agent_a, args=(window_size, st.session_state.live_delay, metrics_a, status_dict))
-        t_b = threading.Thread(target=run_agent_b, args=(window_size, st.session_state.live_delay, metrics_b, status_dict))
-        t_c = threading.Thread(target=run_agent_c, args=(window_size, st.session_state.live_delay, metrics_c, status_dict))
-        
-        t_a.start(); t_b.start(); t_c.start()
-        
-        progress = st.progress(0, text="Агенты анализируют...")
-        step = 0
-        
-        while any([t_a.is_alive(), t_b.is_alive(), t_c.is_alive()]):
-            step += 1
-            progress.progress(min(1.0, step/30))
-            time.sleep(0.5)  # Небольшая пауза
-        
-        t_a.join(); t_b.join(); t_c.join()
-        status_dict.update({"a": "✅ завершён", "b": "✅ завершён", "c": "✅ завершён"})
-        progress.progress(1.0, text="✅ Агенты завершили анализ!")
-        
-        st.balloons()
-        st.success("🎉 Live-данные на дашборде! Перейди посмотреть!")
+    if stop_clicked:
+        for src in ['a', 'b', 'c']:
+            if src in st.session_state.stop_events:
+                st.session_state.stop_events[src].set()
+        st.session_state.live_running = False
         st.rerun()
+
+    if start_clicked:
+        # Очищаем старые файлы и БД
+        for path in st.session_state.csv_paths.values():
+            if path.exists():
+                path.unlink()
+        reset_experiment()
+
+        hosts = {'a': HTTP_HOSTS[host_a], 'b': HTTP_HOSTS[host_b], 'c': HTTP_HOSTS[host_c]}
+        metrics_map = {'a': metrics_a, 'b': metrics_b, 'c': metrics_c}
+
+        for src in ['a', 'b', 'c']:
+            # Останавливаем старый поток
+            if src in st.session_state.stop_events:
+                st.session_state.stop_events[src].set()
+
+            stop_event = threading.Event()
+            st.session_state.stop_events[src] = stop_event
+
+            # Один поток делает всё: опрос → накопление → метрики → сервер
+            t = threading.Thread(
+                target=live_agent_loop,
+                args=(
+                    src,
+                    hosts[src],
+                    st.session_state.csv_paths[src],
+                    stop_event,
+                    live_window,
+                    live_interval,
+                    metrics_map[src],
+                ),
+                daemon=True
+            )
+            st.session_state.ping_threads[src] = t
+            t.start()
+
+        st.session_state.live_running = True
+        st.rerun()
+
+    # Дашборд статуса — обновляется при каждом рендере
+    if st.session_state.live_running or any(
+        st.session_state.csv_paths[s].exists() for s in ['a', 'b', 'c']
+    ):
+        st.markdown("### 📊 Данные в реальном времени")
+        cols = st.columns(3)
+        for i, src in enumerate(['a', 'b', 'c']):
+            path = st.session_state.csv_paths[src]
+            with cols[i]:
+                if path.exists():
+                    try:
+                        df_live = pd.read_csv(path)
+                        n = len(df_live)
+                        valid = df_live['value'].notna().sum()
+                        last = df_live['value'].dropna().iloc[-1] if valid > 0 else float('nan')
+                        windows_sent = n // live_window
+
+                        st.metric(
+                            f"Источник {src.upper()}",
+                            f"{n} записей",
+                            f"отправлено окон: {windows_sent}"
+                        )
+                        if not pd.isna(last):
+                            st.caption(f"Последний запрос: {last:.1f} мс")
+                        if n > 1:
+                            st.line_chart(
+                                df_live.set_index('timestamp')['value'].dropna(),
+                                height=150
+                            )
+                    except Exception as e:
+                        st.error(str(e))
+                else:
+                    st.metric(f"Источник {src.upper()}", "0 записей", "ждём...")
+
+        if st.session_state.live_running:
+            st.info("🔴 Мониторинг активен. Обновите страницу чтобы увидеть свежие данные, или нажмите кнопку ниже.")
+            if st.button("🔄 Обновить данные"):
+                st.rerun()
 
 
 # --- РЕЖИМ ГЕНЕРАЦИИ ДАННЫХ ---
