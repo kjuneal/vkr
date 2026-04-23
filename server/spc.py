@@ -1,5 +1,3 @@
-# server/spc.py
-
 import numpy as np
 from sqlalchemy.orm import Session
 from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean
@@ -12,28 +10,28 @@ class SPCState(Base):
     __tablename__ = "spc_state"
 
     id            = Column(Integer, primary_key=True, index=True)
-    source        = Column(String, index=True)
-    metric_name   = Column(String, index=True)
+    source        = Column(String, index=True) # источник
+    metric_name   = Column(String, index=True) # метрика
 
-    n_baseline    = Column(Integer, default=0)
-    mu_hat        = Column(Float,   default=None)
-    sigma_hat     = Column(Float,   default=None)
-    m2            = Column(Float,   default=0.0)
+    n_baseline    = Column(Integer, default=0) # записей в окне
+    mu_hat        = Column(Float,   default=None) # мат ожидание генерируемой выборки
+    sigma_hat     = Column(Float,   default=None) # стд отклонение генерируемой выборки
+    m2            = Column(Float,   default=0.0) # для алгоритма Уэлфорда
 
-    ucl           = Column(Float, default=None)
-    lcl           = Column(Float, default=None)
+    ucl           = Column(Float, default=None) # верхняя граница
+    lcl           = Column(Float, default=None) # нижняя граница
 
-    cusum_pos     = Column(Float, default=0.0)
-    cusum_neg     = Column(Float, default=0.0)
+    cusum_pos     = Column(Float, default=0.0) # поз КУСУМ
+    cusum_neg     = Column(Float, default=0.0) # нег КУСУМ
+ 
+    ewma_z        = Column(Float, default=None) # взвешенное скользящее среднее
 
-    ewma_z        = Column(Float, default=None)
-
-    status          = Column(String,  default="collecting")
-    signal_shewhart = Column(Boolean, default=False)
-    signal_cusum    = Column(Boolean, default=False)
-    signal_ewma     = Column(Boolean, default=False)
-    last_signal_at  = Column(DateTime, default=None)
-    updated_at      = Column(DateTime, default=datetime.utcnow)
+    status          = Column(String,  default="collecting") #
+    signal_shewhart = Column(Boolean, default=False) #
+    signal_cusum    = Column(Boolean, default=False) #
+    signal_ewma     = Column(Boolean, default=False) #
+    last_signal_at  = Column(DateTime, default=None) #
+    updated_at      = Column(DateTime, default=datetime.utcnow) #
 
 
 BASELINE_SIZE = 10 #############   5, 10
@@ -59,7 +57,7 @@ def update_spc(db: Session, source: str, metric_name: str, new_value: float) -> 
             state.mu_hat    = new_value
             state.sigma_hat = 0.0
             state.m2        = 0.0
-        else:
+        else: # Вычисление дисперсии по алгоритму Уэлфорда (одиночный проход)
             delta           = new_value - state.mu_hat
             state.mu_hat    = float(state.mu_hat + delta / state.n_baseline)
             delta2          = new_value - state.mu_hat
@@ -73,7 +71,7 @@ def update_spc(db: Session, source: str, metric_name: str, new_value: float) -> 
         return state
 
     # ── Фаза II ───────────────────────────────────────────────────────────
-    if state.ucl is None:
+    if state.ucl is None: # Вычисление границ для Шухарта, правило 3 сигм 99,7
         state.ucl    = state.mu_hat + 3 * state.sigma_hat
         state.lcl    = state.mu_hat - 3 * state.sigma_hat
         state.ewma_z = state.mu_hat
@@ -81,11 +79,11 @@ def update_spc(db: Session, source: str, metric_name: str, new_value: float) -> 
     sigma = state.sigma_hat if state.sigma_hat and state.sigma_hat > 0 else 1e-9
 
     # Шухарт
-    signal_shewhart = (new_value > state.ucl) or (new_value < state.lcl)
+    signal_shewhart = (new_value > state.ucl) or (new_value < state.lcl) # Проверка выхода за границы 
 
     # CUSUM
     k = CUSUM_K * sigma
-    h = CUSUM_H * sigma
+    h = CUSUM_H * sigma # Граница КУСУМа
     state.cusum_pos = max(0.0, state.cusum_pos + (new_value - state.mu_hat) - k)
     state.cusum_neg = max(0.0, state.cusum_neg - (new_value - state.mu_hat) - k)
     signal_cusum = (state.cusum_pos > h) or (state.cusum_neg > h)
@@ -97,8 +95,7 @@ def update_spc(db: Session, source: str, metric_name: str, new_value: float) -> 
     state.ewma_z   = EWMA_LAMBDA * new_value + (1 - EWMA_LAMBDA) * state.ewma_z
     ewma_sigma     = sigma * np.sqrt(EWMA_LAMBDA / (2 - EWMA_LAMBDA))
     signal_ewma    = (
-        state.ewma_z > state.mu_hat + EWMA_L * ewma_sigma or
-        state.ewma_z < state.mu_hat - EWMA_L * ewma_sigma
+        state.ewma_z > state.mu_hat + EWMA_L * ewma_sigma or state.ewma_z < state.mu_hat - EWMA_L * ewma_sigma
     )
 
     # Статус

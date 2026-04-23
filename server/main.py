@@ -31,7 +31,7 @@ def receive_metrics(batch: schemas.MetricsBatch, db: Session = Depends(get_db)):
     results = []
 
     for name, value in batch.metrics.items():
-        # 1. Сохраняем метрику как раньше
+        # 1. Сохраняем метрику 
         metric = schemas.MetricCreate(
             source=batch.source,
             metric_name=name,
