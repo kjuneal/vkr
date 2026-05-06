@@ -79,7 +79,7 @@ DEGRADATION_FUNCS = {
     "variance":      lambda df, start, val: add_variance_increase(df, val, start),
     "missing":       lambda df, start, val: add_missing_values(df, val, start),
     "gradual_drift": lambda df, start, val: add_gradual_drift(df, val, start),
-    "spikes":        lambda df, start, val: add_spikes(df, val, start),
+    "spikes":        lambda df, start, val: add_spikes(df, val, start_index=start),
 }
 
 def generate_data(n, mu, sigma, degradation, deg_start, deg_value):

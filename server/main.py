@@ -113,6 +113,7 @@ def get_metrics_history(source: str, metric_name: str, limit: int = 200, db: Ses
 def reset_experiment(db: Session = Depends(get_db)):
     db.query(models.Metric).delete()
     db.query(spc.SPCState).delete()
+    db.query(spc.SPCEvent).delete()
     db.commit()
     return {"status": "cleared"}
 

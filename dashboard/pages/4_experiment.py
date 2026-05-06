@@ -47,99 +47,99 @@ def read_uploaded_df(uploaded_file):
 PRESETS = {
     "1а — Сдвиг среднего (Δ=20)": {
         "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
-        "n_a": 800, "deg_type_a": "mean_shift", "deg_start_a": 200, "deg_val_a": 20.0,
-        "n_b": 800, "deg_type_b": "mean_shift", "deg_start_b": 200, "deg_val_b": 20.0,
-        "n_c": 800, "deg_type_c": "mean_shift", "deg_start_c": 200, "deg_val_c": 20.0,
+        "n_a": 2000, "deg_type_a": "mean_shift", "deg_start_a": 1000, "deg_val_a": 20.0,
+        "n_b": 2000, "deg_type_b": "mean_shift", "deg_start_b": 1000, "deg_val_b": 20.0,
+        "n_c": 2000, "deg_type_c": "mean_shift", "deg_start_c": 1000, "deg_val_c": 20.0,
         "sel_a": ["mean","median","std","completeness","iqr"],
         "sel_b": ["mean","median","std","completeness","iqr"],
         "sel_c": ["mean","median","std","completeness","iqr"],
     },
     "1б — Рост дисперсии (Δσ=10)": {
         "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
-        "n_a": 800, "deg_type_a": "variance", "deg_start_a": 200, "deg_val_a": 10.0,
-        "n_b": 800, "deg_type_b": "variance", "deg_start_b": 200, "deg_val_b": 10.0,
-        "n_c": 800, "deg_type_c": "variance", "deg_start_c": 200, "deg_val_c": 10.0,
+        "n_a": 2000, "deg_type_a": "variance", "deg_start_a": 1000, "deg_val_a": 10.0,
+        "n_b": 2000, "deg_type_b": "variance", "deg_start_b": 1000, "deg_val_b": 10.0,
+        "n_c": 2000, "deg_type_c": "variance", "deg_start_c": 1000, "deg_val_c": 10.0,
         "sel_a": ["mean","median","std","completeness","iqr"],
         "sel_b": ["mean","median","std","completeness","iqr"],
         "sel_c": ["mean","median","std","completeness","iqr"],
     },
     "1в — Постепенный дрейф (δ=0.3)": {
         "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
-        "n_a": 800, "deg_type_a": "gradual_drift", "deg_start_a": 200, "deg_val_a": 0.3,
-        "n_b": 800, "deg_type_b": "gradual_drift", "deg_start_b": 200, "deg_val_b": 0.3,
-        "n_c": 800, "deg_type_c": "gradual_drift", "deg_start_c": 200, "deg_val_c": 0.3,
+        "n_a": 2000, "deg_type_a": "gradual_drift", "deg_start_a": 1000, "deg_val_a": 0.3,
+        "n_b": 2000, "deg_type_b": "gradual_drift", "deg_start_b": 1000, "deg_val_b": 0.3,
+        "n_c": 2000, "deg_type_c": "gradual_drift", "deg_start_c": 1000, "deg_val_c": 0.3,
         "sel_a": ["mean","median","std","completeness","iqr"],
         "sel_b": ["mean","median","std","completeness","iqr"],
         "sel_c": ["mean","median","std","completeness","iqr"],
     },
     "1г — Пропуски (30%)": {
         "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
-        "n_a": 800, "deg_type_a": "missing", "deg_start_a": 200, "deg_val_a": 0.3,
-        "n_b": 800, "deg_type_b": "missing", "deg_start_b": 200, "deg_val_b": 0.3,
-        "n_c": 800, "deg_type_c": "missing", "deg_start_c": 200, "deg_val_c": 0.3,
+        "n_a": 2000, "deg_type_a": "missing", "deg_start_a": 1000, "deg_val_a": 0.3,
+        "n_b": 2000, "deg_type_b": "missing", "deg_start_b": 1000, "deg_val_b": 0.3,
+        "n_c": 2000, "deg_type_c": "missing", "deg_start_c": 1000, "deg_val_c": 0.3,
         "sel_a": ["mean","median","std","completeness","iqr"],
         "sel_b": ["mean","median","std","completeness","iqr"],
         "sel_c": ["mean","median","std","completeness","iqr"],
     },
     "1д — Случайные выбросы (15%)": {
         "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
-        "n_a": 800, "deg_type_a": "spikes", "deg_start_a": 200, "deg_val_a": 0.15,
-        "n_b": 800, "deg_type_b": "spikes", "deg_start_b": 200, "deg_val_b": 0.15,
-        "n_c": 800, "deg_type_c": "spikes", "deg_start_c": 200, "deg_val_c": 0.15,
+        "n_a": 2000, "deg_type_a": "spikes", "deg_start_a": 1000, "deg_val_a": 0.15,
+        "n_b": 2000, "deg_type_b": "spikes", "deg_start_b": 1000, "deg_val_b": 0.15,
+        "n_c": 2000, "deg_type_c": "spikes", "deg_start_c": 1000, "deg_val_c": 0.15,
         "sel_a": ["mean","median","std","completeness","iqr"],
         "sel_b": ["mean","median","std","completeness","iqr"],
         "sel_c": ["mean","median","std","completeness","iqr"],
     },
-    "2а — Сдвиг 1σ (Δ=5)": {
+    "2а — Сдвиг 1σ (Δ=1.1)": {
         "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
-        "n_a": 800, "deg_type_a": "mean_shift", "deg_start_a": 200, "deg_val_a": 5.0,
-        "n_b": 800, "deg_type_b": "mean_shift", "deg_start_b": 200, "deg_val_b": 5.0,
-        "n_c": 800, "deg_type_c": "mean_shift", "deg_start_c": 200, "deg_val_c": 5.0,
+        "n_a": 2000, "deg_type_a": "mean_shift", "deg_start_a": 1000, "deg_val_a": 1.1,
+        "n_b": 2000, "deg_type_b": "mean_shift", "deg_start_b": 1000, "deg_val_b": 1.1,
+        "n_c": 2000, "deg_type_c": "mean_shift", "deg_start_c": 1000, "deg_val_c": 1.1,
         "sel_a": ["mean","median","std","completeness","iqr"],
         "sel_b": ["mean","median","std","completeness","iqr"],
         "sel_c": ["mean","median","std","completeness","iqr"],
     },
-    "2б — Сдвиг 2σ (Δ=10)": {
+    "2б — Сдвиг 2σ (Δ=2.2)": {
         "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
-        "n_a": 800, "deg_type_a": "mean_shift", "deg_start_a": 200, "deg_val_a": 10.0,
-        "n_b": 800, "deg_type_b": "mean_shift", "deg_start_b": 200, "deg_val_b": 10.0,
-        "n_c": 800, "deg_type_c": "mean_shift", "deg_start_c": 200, "deg_val_c": 10.0,
+        "n_a": 800, "deg_type_a": "mean_shift", "deg_start_a": 1000, "deg_val_a": 2.2,
+        "n_b": 800, "deg_type_b": "mean_shift", "deg_start_b": 1000, "deg_val_b": 2.2,
+        "n_c": 800, "deg_type_c": "mean_shift", "deg_start_c": 1000, "deg_val_c": 2.2,
         "sel_a": ["mean","median","std","completeness","iqr"],
         "sel_b": ["mean","median","std","completeness","iqr"],
         "sel_c": ["mean","median","std","completeness","iqr"],
     },
-    "2в — Сдвиг 3σ (Δ=15)": {
+    "2в — Сдвиг 3σ (Δ=3.4)": {
         "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
-        "n_a": 800, "deg_type_a": "mean_shift", "deg_start_a": 200, "deg_val_a": 15.0,
-        "n_b": 800, "deg_type_b": "mean_shift", "deg_start_b": 200, "deg_val_b": 15.0,
-        "n_c": 800, "deg_type_c": "mean_shift", "deg_start_c": 200, "deg_val_c": 15.0,
+        "n_a": 2000, "deg_type_a": "mean_shift", "deg_start_a": 1000, "deg_val_a": 3.4,
+        "n_b": 2000, "deg_type_b": "mean_shift", "deg_start_b": 1000, "deg_val_b": 3.4,
+        "n_c": 2000, "deg_type_c": "mean_shift", "deg_start_c": 1000, "deg_val_c": 3.4,
         "sel_a": ["mean","median","std","completeness","iqr"],
         "sel_b": ["mean","median","std","completeness","iqr"],
         "sel_c": ["mean","median","std","completeness","iqr"],
     },
-    "2г — Сдвиг 5σ (Δ=25)": {
+    "2г — Сдвиг 5σ (Δ=5.6)": {
         "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
-        "n_a": 800, "deg_type_a": "mean_shift", "deg_start_a": 200, "deg_val_a": 25.0,
-        "n_b": 800, "deg_type_b": "mean_shift", "deg_start_b": 200, "deg_val_b": 25.0,
-        "n_c": 800, "deg_type_c": "mean_shift", "deg_start_c": 200, "deg_val_c": 25.0,
+        "n_a": 2000, "deg_type_a": "mean_shift", "deg_start_a": 1000, "deg_val_a": 5.6,
+        "n_b": 2000, "deg_type_b": "mean_shift", "deg_start_b": 1000, "deg_val_b": 5.6,
+        "n_c": 2000, "deg_type_c": "mean_shift", "deg_start_c": 1000, "deg_val_c": 5.6,
         "sel_a": ["mean","median","std","completeness","iqr"],
         "sel_b": ["mean","median","std","completeness","iqr"],
         "sel_c": ["mean","median","std","completeness","iqr"],
     },
     "3а — Выбросы 10%": {
         "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
-        "n_a": 800, "deg_type_a": "spikes", "deg_start_a": 200, "deg_val_a": 0.1,
-        "n_b": 800, "deg_type_b": "spikes", "deg_start_b": 200, "deg_val_b": 0.1,
-        "n_c": 800, "deg_type_c": "spikes", "deg_start_c": 200, "deg_val_c": 0.1,
+        "n_a": 2000, "deg_type_a": "spikes", "deg_start_a": 1000, "deg_val_a": 0.1,
+        "n_b": 2000, "deg_type_b": "spikes", "deg_start_b": 1000, "deg_val_b": 0.1,
+        "n_c": 2000, "deg_type_c": "spikes", "deg_start_c": 1000, "deg_val_c": 0.1,
         "sel_a": ["mean","median","std","completeness","iqr"],
         "sel_b": ["mean","median","std","completeness","iqr"],
         "sel_c": ["mean","median","std","completeness","iqr"],
     },
     "3б — Выбросы 25%": {
         "mu": 100.0, "sigma": 5.0, "window_size": 20, "delay": 0,
-        "n_a": 800, "deg_type_a": "spikes", "deg_start_a": 200, "deg_val_a": 0.25,
-        "n_b": 800, "deg_type_b": "spikes", "deg_start_b": 200, "deg_val_b": 0.25,
-        "n_c": 800, "deg_type_c": "spikes", "deg_start_c": 200, "deg_val_c": 0.25,
+        "n_a": 2000, "deg_type_a": "spikes", "deg_start_a": 1000, "deg_val_a": 0.25,
+        "n_b": 2000, "deg_type_b": "spikes", "deg_start_b": 1000, "deg_val_b": 0.25,
+        "n_c": 2000, "deg_type_c": "spikes", "deg_start_c": 1000, "deg_val_c": 0.25,
         "sel_a": ["mean","median","std","completeness","iqr"],
         "sel_b": ["mean","median","std","completeness","iqr"],
         "sel_c": ["mean","median","std","completeness","iqr"],
@@ -234,7 +234,7 @@ st.divider()
 st.subheader("📥 Источник данных")
 data_mode = st.radio(
     "Выберите режим подготовки данных",
-    ["Синтетические данные", "Загруженные данные из файла", "Живой мониторинг пинга"],
+    ["Синтетические данные", "Загруженные данные из файла", "Live-мониторинг пинга"],
     horizontal=True
 )
 
@@ -489,7 +489,7 @@ def file_block(source_key):
 
 st.divider()
 
-if data_mode == "Живой мониторинг пинга":
+if data_mode == "Live-мониторинг пинга":
 
     # Инициализация состояния
     for key, default in [

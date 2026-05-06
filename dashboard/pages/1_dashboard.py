@@ -65,7 +65,7 @@ for col, (source_name, metrics) in zip(cols, sorted(sources.items())):
             val   = m.get("last_value") or m.get("ewma_z")
 
             if m["status"] == "collecting":
-                delta_str = f"сбор: {m['n_baseline']}/5"
+                delta_str = f"сбор: {m['n_baseline']}/50"
             elif m["mu_hat"] and m["sigma_hat"] and val and float(m["sigma_hat"]) != 0:
                 delta = (float(val) - float(m["mu_hat"])) / float(m["sigma_hat"])
                 delta_str = f"{delta:+.2f}σ"
