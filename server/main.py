@@ -6,9 +6,8 @@ from server import spc
 from server.database import engine, SessionLocal
 from server.models import Metric, ExperimentConfig
 
-# Создаём таблицы (включая новую spc_state)
 models.Base.metadata.create_all(bind=engine)
-spc.SPCState.metadata.create_all(bind=engine)  # ← добавить
+spc.SPCState.metadata.create_all(bind=engine)  
 
 app = FastAPI()
 
@@ -31,7 +30,6 @@ def receive_metrics(batch: schemas.MetricsBatch, db: Session = Depends(get_db)):
     results = []
 
     for name, value in batch.metrics.items():
-        # 1. Сохраняем метрику 
         metric = schemas.MetricCreate(
             source=batch.source,
             metric_name=name,
@@ -40,9 +38,6 @@ def receive_metrics(batch: schemas.MetricsBatch, db: Session = Depends(get_db)):
         )
         crud.create_metric(db=db, metric=metric)
 
-        ## 2. Запускаем SPC-анализ ← новое
-        ## spc.update_spc(db=db, source=batch.source, metric_name=name, new_value=value)
-        # SPC только для нужных метрик
         if name in spc.SPC_METRICS:
             spc.update_spc(db=db, source=batch.source, metric_name=name, new_value=value)
 
@@ -51,7 +46,7 @@ def receive_metrics(batch: schemas.MetricsBatch, db: Session = Depends(get_db)):
     return results
 
 
-# ── Эндпоинты для Streamlit ───────────────────────────────────────────────
+# Эндпоинты для Streamlit 
 @app.get("/spc/")
 def get_all_spc_states(db: Session = Depends(get_db)):
     states = spc.get_all_states(db)
@@ -65,7 +60,6 @@ def get_spc_state(source: str, metric_name: str, db: Session = Depends(get_db)):
     return _state_to_dict(state, db)
 
 def _state_to_dict(s, db: Session = None) -> dict:
-    # Получаем последнее значение метрики из таблицы metrics
     last_value = None
     if db:
         last = (
@@ -89,7 +83,7 @@ def _state_to_dict(s, db: Session = None) -> dict:
         "cusum_pos":        s.cusum_pos,
         "cusum_neg":        s.cusum_neg,
         "ewma_z":           s.ewma_z,
-        "last_value":       last_value,   # ← новое поле
+        "last_value":       last_value,  
         "signal_shewhart":  s.signal_shewhart,
         "signal_cusum":     s.signal_cusum,
         "signal_ewma":      s.signal_ewma,
@@ -121,7 +115,6 @@ from server.models import ExperimentConfig
 
 @app.post("/experiment/config/")
 def save_experiment_config(config: dict, db: Session = Depends(get_db)):
-    # Удаляем старый конфиг и сохраняем новый
     db.query(ExperimentConfig).delete()
     db.add(ExperimentConfig(config=config))
     db.commit()

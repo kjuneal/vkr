@@ -1,6 +1,8 @@
 scenario,CUSUM,EWMA,Шухарт
 gradual_drift_fast,1.00,1.00,1.00
+gradual_drift_medium,1.00,1.00,1.00
 gradual_drift_slow,1.00,1.00,1.00
+gradual_drift_very_slow,1.00,1.00,1.00
 mean_shift_2sigma,1.00,1.00,1.00
 spikes_5pct,1.00,1.00,1.00
 variance_doubling,1.00,1.00,1.00

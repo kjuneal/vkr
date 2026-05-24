@@ -3,12 +3,14 @@
 ## Сводная таблица
 
 ```
-          scenario  CUSUM  EWMA  Шухарт
-gradual_drift_fast    4.0   3.7     3.8
-gradual_drift_slow   14.0  14.1    17.0
- mean_shift_2sigma    3.7   2.5     3.8
-       spikes_5pct   27.8  17.9     7.4
- variance_doubling    3.3   2.3     3.0
+               scenario  CUSUM  EWMA  Шухарт
+     gradual_drift_fast    4.0   3.6     3.7
+   gradual_drift_medium    6.7   6.1     7.5
+     gradual_drift_slow    9.1   8.8    11.6
+gradual_drift_very_slow   13.1  13.0    18.0
+      mean_shift_2sigma    3.8   2.6     5.0
+            spikes_5pct   23.0  25.5    11.9
+      variance_doubling    3.3   2.4     3.3
 ```
 
 ## Сгенерированные файлы

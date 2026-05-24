@@ -27,6 +27,8 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
+np.random.seed(42)
+
 import pandas as pd
 from tqdm import tqdm
 

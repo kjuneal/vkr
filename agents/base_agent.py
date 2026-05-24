@@ -3,13 +3,12 @@ from datetime import datetime
 
 def compute_metrics(series, selected: list) -> dict:
     """
-    Вычисляет выбранные метрики для pandas Series.
     series  — столбец значений (может содержать NaN)
     selected — список строк: ['mean','std','completeness','median','iqr']
     """
     results = {}
     n       = len(series)
-    clean   = series.dropna()  # без NaN для числовых метрик
+    clean   = series.dropna()
 
     if "mean" in selected:
         results["mean"] = float(clean.mean()) if len(clean) else float("nan")
@@ -27,7 +26,6 @@ def compute_metrics(series, selected: list) -> dict:
         q75, q25 = clean.quantile(0.75), clean.quantile(0.25)
         results["iqr"] = float(q75 - q25) if len(clean) else float("nan")
 
-    # count всегда добавляем — нужен для контекста
     results["count"] = n
 
     return results
